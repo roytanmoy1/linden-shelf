@@ -17,9 +17,11 @@ const replyTo = `${marker}@example.test`;
 
 async function json(url, status = 200) {
   const response = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(10000) });
-  assert.equal(response.status, status, new URL(url).pathname);
   assert.match(response.headers.get('content-type') ?? '', /^application\/json\b/);
-  return response.json();
+  const body = await response.json();
+  const code = body?.error?.code;
+  assert.equal(response.status, status, `${new URL(url).pathname}: HTTP ${response.status}${typeof code === 'string' && /^[A-Z_]{1,40}$/.test(code) ? ` (${code})` : ''}`);
+  return body;
 }
 
 async function checkTiles(list, ids) {
@@ -45,12 +47,19 @@ async function checkMail(product) {
 
 assert.equal((await json(`${web}/api/health`)).services.api, 'ready');
 assert.equal((await json(`${web}/api/not-a-route`, 404)).error.code, 'NOT_FOUND');
+const featured = await json(`${web}/api/products/featured`);
+assert.deepEqual(featured.products.map((item) => item.id), picks, 'The deployed API must return the chosen IDs before rendering');
 await json(`${inbox}/api/v1/info`);
 const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
 const browser = await chromium.launch(executablePath ? { executablePath } : {});
 try {
   const page = await browser.newPage();
   page.setDefaultTimeout(15000);
+  page.on('pageerror', (error) => console.error(`Browser error: ${error.message.slice(0, 200)}`));
+  page.on('response', (response) => {
+    const url = new URL(response.url());
+    if (url.origin === web && response.status() >= 400) console.error(`Browser HTTP ${response.status()}: ${url.pathname}`);
+  });
   const externalData = [];
   page.on('request', (request) => {
     const url = new URL(request.url());
