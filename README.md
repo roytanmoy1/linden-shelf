@@ -1,8 +1,25 @@
 # Linden Shelf
 
-A customer can browse five editorial picks, explore a category, search, open a
-product and send an enquiry to sales. No account, payment or email-provider
-credentials are needed to try it locally.
+Browse editorial picks and compare prices and ratings. Remove individual filters
+above the results, or clear them from an empty result without losing the search
+term or sort. Open a product to inspect its original photo or enquire; going
+Back restores keyboard focus to that product when it is still listed. No account,
+payment or email-provider credentials are needed. See the [interview guide and data-flow diagram](docs/interview.md).
+
+The light storefront uses a white masthead, green actions, uncropped product
+photos and full product titles. Native browse controls and the deferred contact
+form share color tokens, focus treatment and touch-friendly dimensions.
+
+Click the search field to see up to five recent searches. An empty magnifier
+click also opens history without leaving the current results; a nonempty query
+submits with the magnifier or Enter. Arrow keys move through recent terms,
+Escape or an outside click closes the panel, and Clear history updates other tabs.
+Drafts are not saved and focusing or typing does not request product data.
+
+Category, rating and sort use customizable native pickers where the browser
+supports `appearance: base-select`, with a standard native picker fallback.
+The four-viewport regression suite uses Chromium. The real reviewer journey
+can also run with Playwright's Firefox and WebKit engines.
 
 | Directory | Responsibility |
 | --- | --- |
@@ -11,9 +28,6 @@ credentials are needed to try it locally.
 | [packages/contracts](packages/contracts) | Shared TypeScript types, runtime validation and limits |
 | [tests](tests) | Shared fixtures, browser journeys, compiled-server smoke and configuration checks |
 | [docs](docs) | Verification evidence, time log and a guided code walkthrough |
-
-Unit tests stay beside the code they exercise. Start with the
-[interview walkthrough](docs/interview.md) to trace a real search and enquiry.
 
 ## Stack and Rationale
 
@@ -29,10 +43,13 @@ CSS tokens keep the eventual creative design independent of catalogue rules.
 
 ## Run with Compose
 
-Prerequisites: a running Docker engine with Compose v2 and internet access.
-From the project root, no credentials or environment-file copy are required:
+Prerequisites: Git, a running Docker engine with Compose v2, and internet access
+for product data. The implementation is on the [open feature PR](https://github.com/roytanmoy1/linden-shelf/pull/1);
+`main` is the review baseline. From a new checkout:
 
 ```sh
+git clone --branch feature/catalogue --single-branch https://github.com/roytanmoy1/linden-shelf.git
+cd linden-shelf
 docker compose up --build
 ```
 
@@ -40,28 +57,10 @@ docker compose up --build
 - Local sales inbox: `http://localhost:8025`
 - API health through the web proxy: `http://localhost:3000/api/health`
 
-Only web and inbox ports are published, both on loopback. API and SMTP are
-internal. Mailpit is ephemeral local acceptance infrastructure; stopping its
-container loses captured messages. Stop with `docker compose down`.
-
-Alternate ports in PowerShell:
-
-```powershell
-$env:WEB_PORT='3100'
-$env:MAILPIT_HTTP_PORT='8125'
-docker compose up --build
-```
-
-Compose derives allowed browser origins from `WEB_PORT`, including both
-`localhost` and `127.0.0.1`. It deliberately fixes SMTP to internal Mailpit.
-Healthchecks make no public-source calls and send no email. The Dockerfiles use
-Node 24.22.3, unprivileged nginx 1.31.7 and Mailpit 1.34.0 with non-root processes,
-read-only filesystems, temporary writable directories and dropped capabilities.
-
-The PR's `reviewer` job times the unmodified stack through healthy services.
-Its [GitHub Actions](https://github.com/roytanmoy1/linden-shelf/actions) summary
-separately labels build-to-browser timings by product source. The public supplier
-has returned HTTP 403 to hosted runners; that outcome is reported, not bypassed.
+Only web and the ephemeral inbox are published on loopback. API and SMTP remain
+internal. Override `WEB_PORT` or `MAILPIT_HTTP_PORT` if occupied. Stop with
+`docker compose down`. Hosted supplier restrictions and measured timings are in
+the [acceptance record](docs/acceptance.md), not a guarantee for every machine.
 
 ### Choose the five products
 
@@ -80,9 +79,11 @@ explicit catalogue error rather than silently substituting another product.
 
 Prerequisites: Node 24, npm 11 and an installed Mailpit binary for genuine local
 SMTP. Validated application toolchain: Node 24.22.3/npm 11.21.3. With these
-prerequisites and a populated npm cache, a clean source copy reached the real
-browser catalogue in **3 minutes 47 seconds**, including install and build.
-This was a native run, not a Docker timing. From the root:
+prerequisites, Chrome and a populated npm cache, the release source tree went
+from `npm ci` through a production build to five real browser tiles and a
+decoded photo in **3 minutes 18 seconds**. No dependencies, build output or
+real `.env` were copied into the checkout. This was a native measurement,
+not a cold Docker timing. From the root:
 
 ```sh
 npm ci
@@ -107,34 +108,14 @@ Start the web app in a third terminal:
 npm run start:web
 ```
 
-Open `http://127.0.0.1:5173`; `npm run dev` is the same web command. Vite proxies
-`/api` to `127.0.0.1:3001`. For an occupied web port, use
-`npm --prefix services/catalogue-web run dev -- --port 5180` and restart the API
-with the matching `ALLOWED_ORIGINS`. Never stop an unrelated process to free a port.
-API health is `http://127.0.0.1:3001/api/health`. Stop processes with Ctrl+C.
-Startup and health do not contact FakeStore or SMTP. Product requests need internet.
-
-An older host can use an isolated toolchain, without a global upgrade:
-
-```sh
-npm exec --yes --package=node@24.22.3 --package=npm@11.21.3 -- npm ci
-```
-
-Use the same prefix before other npm commands. On Windows, use canonical drive
-casing (`C:/...`, not `c:/...`) if supplying npm's `--prefix`; otherwise Vitest can
-load duplicate runner state. Do not treat a bootstrap warning alone as evidence
-that the requested command completed.
-
-[.env.example](.env.example) lists all server-only settings. Environment variables
-take precedence over an optional, ignored root `.env`, loaded by `start:api`.
-Native defaults bind `127.0.0.1:3001`, allow `localhost` and `127.0.0.1` on web
-ports 3000 and 5173, and use SMTP `127.0.0.1:1025` without credentials. Do not
-send test messages to an external provider.
-
-SMTP sender/recipient default to `catalogue@lindenshelf.test`/`sales@lindenshelf.test`. Credentials
-must be supplied as a pair; authenticated SMTP requires TLS. Connection/greeting
-deadlines are at most 5 seconds and socket inactivity at most 10 seconds. The
-product deadline is at most 5 seconds. Configuration values never reach clients.
+Default web: `http://127.0.0.1:5173`; API: `http://127.0.0.1:3001/api/health`.
+For alternate ports, set API `PORT` and `ALLOWED_ORIGINS`, then set the same
+`CATALOGUE_API_PORT` in the **web process** and run
+`npm --prefix services/catalogue-web run dev -- --port 5189`. The proxy host is
+fixed to loopback. Stop processes with Ctrl+C. The API loads optional server
+settings from the ignored root `.env`; see [.env.example](.env.example).
+Health does not contact the supplier. Product reads need internet. Keep local
+SMTP pointed at Mailpit on port 1025; do not use an external mailbox for tests.
 
 ## Verify
 
@@ -148,14 +129,8 @@ npm run test:smoke
 npm audit --audit-level=high
 ```
 
-`npm test` runs the Node and jsdom projects. Units use synthetic data, fake
-fetch/SMTP and controlled deadlines. Integration tests use local ephemeral HTTP,
-isolated limiter state/time and read-only parsing of container/CI files.
-`test:smoke` builds and starts the actual compiled API entry,
-checks health and rejected input without upstream/mail IO, then stops it.
-API process and browser bootstrap entries are outside unit coverage; compiled
-smoke and browser checks verify their wiring. Tests/setup are excluded too.
-Per-file coverage thresholds are 80% for statements, branches, functions and lines.
+`npm test` runs the isolated Node/jsdom suites. The four per-file coverage
+thresholds are 80%. `test:smoke` builds the app and exercises the compiled API.
 
 For deterministic browser acceptance, use installed Chromium (`npx playwright
 install chromium` if needed), or select an existing Chrome executable:
@@ -165,12 +140,12 @@ $env:PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH='C:/Program Files/Google/Chrome/Applica
 npm run test:browser
 ```
 
-The browser suite owns a temporary Vite server on port 4173. Set
-`BROWSER_TEST_PORT=4174` if occupied, or explicitly provide `BROWSER_BASE_URL`
-for an already running local app. Tests cover 1440px, 390px and 320px widths,
-keyboard/focus, deep links, search, enquiry states, Axe accessibility and overflow.
-API and image responses in this suite are test-only fixtures, **not SMTP or live
-image evidence**. Screenshots stay in ignored `test-results/`; tracing is disabled.
+The browser suite uses port 4173 or `BROWSER_BASE_URL`. It exercises desktop,
+tablet and phone layouts at 1440/820/390/320px, keyboard and Axe checks, price
+correction, full sort-label visibility with active filters, consistent contact-form
+styling, empty-result recovery, paging, Back/Forward focus, two-tab search history,
+zoom and enquiry failures. Its fixtures do
+not prove SMTP delivery. Screenshots stay in ignored `test-results/`.
 
 For the **unmocked** run, start the local Compose stack above, install the locked
 Node dependencies with `npm ci` and use Chromium as for `test:browser`. Then run:
@@ -179,24 +154,27 @@ Node dependencies with `npm ci` and use Chromium as for `test:browser`. Then run
 npm run test:acceptance
 ```
 
-Use **only a local test stack connected to Mailpit**, never production SMTP.
-The command drives all five journeys and sends one synthetic email. It checks
-the uniquely marked message in Mailpit rather than clearing the inbox or trusting
-the thank-you screen. Default ports are web 3000 and inbox 8025. For native Vite,
-set `WEB_PORT=5173` in the test shell. Pass the same `FEATURED_PRODUCT_IDS`,
-`SALES_EMAIL` and alternate ports to the test shell if the stack overrides them.
+Use **only local Mailpit**. Each invocation sends one synthetic enquiry and
+checks its unique receipt without clearing the inbox. Set `WEB_PORT` to the
+running frontend port (default 3000), `MAILPIT_HTTP_PORT` if different from 8025,
+and `REVIEWER_WIDTH` to `1440`, `390` or `320`. To repeat the same journey in
+another engine, run `npx playwright install firefox webkit` and set
+`REVIEWER_BROWSER=firefox` (desktop width) or `REVIEWER_BROWSER=webkit`.
+Chromium is the default; no extra engines are needed for the quickstart. Use the stack's editorial picks
+and `SALES_EMAIL` if overridden. No credentials are needed.
 
 [CI](.github/workflows/ci.yml) has read-only repository permission. Pushes run
-coverage, lint, typecheck, build, smoke and dependency audit. Pull requests add
-the Docker reviewer journey and graceful API shutdown. The default stack always
+coverage, lint, typecheck, build, smoke and dependency audit. Pull requests also
+run the desktop, tablet and phone browser suite against the built nginx frontend,
+the Docker browser-to-inbox journey and a graceful API shutdown check. The default stack always
 tries the real supplier. A live browser pass is recorded only if it succeeds;
 if the supplier independently returns 403 and the API returns `502/UPSTREAM_ERROR`,
 CI reports that limitation explicitly. Other unexpected failures fail the job.
 
 A separate CI step always runs the same browser journey using the same images
-with the [test-only override](tests/compose.reviewer.yaml). It mounts a synthetic
-supplier response at the API's outbound fetch boundary; the browser test supplies
-the matching synthetic photo. It does **not** mock the app's HTTP routes, catalogue
+with the [test-only override](tests/compose.reviewer.yaml). It supplies synthetic
+catalogue data and a matching raster photo at the API's outbound fetch boundary.
+It does **not** mock the app's HTTP routes, catalogue
 logic, nginx, email transport or Mailpit. This isolates our behavior from public
 supplier availability. It is never loaded by the normal quickstart. There is no deployment job.
 
@@ -207,17 +185,18 @@ supplier availability. It is never loaded by the normal quickstart. There is no 
 | GET | `/api/health` | `{status: "ok", services: {api: "ready"}}` |
 | GET | `/api/products/featured` | `{products: Product[5]}` |
 | GET | `/api/categories` | `{categories: string[]}` |
-| GET | `/api/products?category=...&q=...` | `{products: Product[], featuredIds: number[]}` |
+| GET | `/api/products` | `{products, featuredIds}`; with `page`, also `{pagination: {page, pageCount, pageSize, total}}` |
 | GET | `/api/products/:id` | `{product: Product}` |
+| GET | `/api/products/:id/photo` | Photo bytes (PNG, JPEG or WebP) for a known product; 404 for an unknown ID |
 | POST | `/api/enquiries` | `{status: "sent"}` only after SMTP acceptance |
 
-Products use the shared [catalogue schema](packages/contracts/src/catalogue.ts).
-Editorial IDs come from the five configured picks, not a rating leaderboard. Missing
-selections fail explicitly. Browse order is ascending ID; a category puts its
-selected subset first, followed by remaining IDs once each. Category and query
-intersect. Query matching trims input and searches title/description/category,
-case-insensitively, up to 200 characters. Empty query browses all; unknown category
-is 404. Duplicate, nonscalar or unknown query parameters are rejected.
+List selectors: `q` (trimmed, case-insensitive title/description/category),
+`category`, inclusive `minPrice`/`maxPrice` (USD), `minRating` (1-5), `featured=1`,
+`sort` (`price-asc`, `price-desc`, `rating-desc`, `title-asc`) and `page` (1-999).
+The server filters, orders with an ID tie-breaker, then slices eight per page.
+Absent `page` preserves legacy API behavior. Unknown categories are 404;
+invalid ranges, duplicates, arrays and unknown fields are rejected. Example:
+`GET /api/products?q=SSD&maxPrice=150&minRating=4&sort=price-asc&page=1`.
 
 Enquiry JSON is `{productId, name, email, message?}`. Name is trimmed, required and
 limited to 100 characters; email is valid and at most 254; optional trimmed
@@ -227,26 +206,24 @@ minutes includes invalid input and blocked origins; excess attempts return 429
 with `Retry-After`. Requests without an Origin header may use the API; this is an
 origin policy, not authentication. Native/direct mode ignores forwarding headers.
 
-`TRUST_INGRESS_PROXY=true` enables exactly one trusted hop **only behind protected
-container ingress**. Compose never publishes the API port; nginx overwrites
-`X-Forwarded-For` with `$remote_addr`, clears `Forwarded` and does not append caller
-headers. Do not enable this mode for a directly reachable API, attach untrusted
-containers to its network, or add a bypass path to the API. A directly exposed API
-must keep the default `false`. A regression test proves two forwarded clients do
-not share quota in ingress mode while spoofed forwarding remains ignored natively.
+Use one-hop proxy trust **only** behind the unpublished Compose API with nginx
+overwriting the forwarding headers. Errors are `{error: {code, message, details}}`
+without submitted values or provider payloads. A 503 does not confirm an email;
+there is no automatic retry or exactly-once delivery guarantee.
 
-All application failures are `{error: {code, message, details}}`, with safe field
-keys or `null` details. Statuses distinguish malformed input (400), origin (403),
-not found (404), size (413), media type (415), validation (422), limits (429),
-source failure/invalid data (502), mail failure (503), source timeout (504) and
-unexpected failure (500). No raw provider data, submitted values or stacks are
-returned. There is no automatic delivery retry or exactly-once guarantee.
-Cancelling a browser request or navigating away does not undo possible SMTP
-acceptance; after uncertain delivery, inspect the inbox before retrying.
+The browser fetches **all** product data, including image bytes, from this API.
+The photo route accepts a product ID, not an upstream URL. The backend resolves
+the catalogue image, forbids redirects, checks its media type and signature,
+and limits the decoded body to 4 MiB. A successful photo may be cached privately
+for 15 seconds. A failed photo does not prevent opening a product or enquiring;
+**Retry photo** in detail or zoom retries just the image without losing a draft.
 
-Retrying a failed page restores its title and keyboard focus when the content
-returns. A failed photo falls back independently of its tile; if the supplier
-replaces the photo URL, the product renders the new image without a page reload.
+Only validated public products enter the 30-second server snapshot. Canonical
+detail/featured/category GET successes allow 15s private browser caching;
+lists, searches, errors, health and all enquiries are `no-store`. Sending an
+enquiry bypasses the completed snapshot to resolve its product and price.
+Only the five most recent submitted search terms persist on the device. They
+can be cleared and are never populated from contact fields.
 
 ## Review Materials
 

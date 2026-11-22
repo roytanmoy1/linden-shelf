@@ -1,9 +1,27 @@
 # Time Log
 
-Target: 2-3 hours. The first implementation was approximately 2 hours 45 minutes.
-The subsequent local review, rename, interview guide and extra verification put
-the overall effort **over the time-box**. Estimates include tool waits; they are
-not a claim about uninterrupted candidate effort. All clock times below are +05:30.
+The initial implementation took approximately **2 hours 45 minutes** against
+the 2-3 hour target. The submitted version includes substantial later changes
+and is **over the time-box**. Times below are approximate tool-assisted working
+windows, including test runs and tool waits, not a measure of personal typing
+time. Overnight and between-request gaps are excluded. Clock times are +05:30.
+
+## Consolidated Breakdown
+
+| Scope | Planning / inspection | Building / test authoring | Running tests / diagnosis | Review / documentation | Total |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Initial five-journey implementation | 25 min | 85 min | 40 min | 15 min | 165 min |
+| First review, configuration, rename and original PR | ~5 min | ~25 min | ~40 min | ~20 min | ~90 min |
+| Subsequent UX, accessibility, search, styling and test passes | ~60 min | ~80 min | ~110 min | ~65 min | ~315 min |
+| Final brief audit, fixes and clean release verification | ~5 min | ~10 min | ~20 min | ~5 min | ~40 min |
+
+**Total through final local acceptance: about 10 hours 10 minutes.** The last
+pass ran from 18:54 to 19:35 on 22 November (41 minutes, rounded above). It
+included the same-origin photo fix, filter/sort race, clean installation,
+cross-engine journeys and the final browser regression gate. Git publication
+and the subsequent hosted runner queue/runtime are separate from this local
+total. Activity buckets are retrospective and rounded. The checkpoints below
+are supporting detail and must not be added again.
 
 | Activity | Initial implementation, 20 Nov | First review, 22 Nov | Rename and walkthrough, through 11:08 on 22 Nov |
 | --- | --- | --- | --- |
@@ -28,3 +46,13 @@ and container testing are not counted.
 
 Build and test work were interleaved, so the per-activity allocation is
 retrospective. See [acceptance.md](acceptance.md) for what was verified in those intervals.
+
+## Follow-up Accounting
+
+The later work is included in the feature branch and in the consolidated
+total. The retained request windows between 12:42 and 18:54 on 22 November
+sum to about 315 minutes, including retries and verification. Earlier
+checkpoints such as the 14:28-15:14 filter pass and the 16:18-16:35 focus
+pass fall inside those windows and are not counted twice. For the rough split,
+intervals were classified by the next recorded inspection, edit, check or
+review action. No time for unobserved candidate review is claimed.

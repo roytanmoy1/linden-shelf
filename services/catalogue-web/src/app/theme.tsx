@@ -3,19 +3,27 @@ import type { ReactNode } from 'react';
 
 const theme = {
   ...createLightTheme({
-    10: '#020504', 20: '#071D16', 30: '#0B2C22', 40: '#0F3B2E',
-    50: '#124B39', 60: '#155744', 70: '#17624B', 80: '#17624B',
-    90: '#327A60', 100: '#4C9176', 110: '#68A88D', 120: '#86BDA4',
-    130: '#A5D1BC', 140: '#C4E4D4', 150: '#E1F2E9', 160: '#F3FAF6',
+    10: '#071A11', 20: '#0D2B1C', 30: '#103726', 40: '#12422D',
+    50: '#154D36', 60: '#14533B', 70: '#155B41', 80: '#176348',
+    90: '#287452', 100: '#418765', 110: '#5A9A7B', 120: '#7CAF95',
+    130: '#A0C5AF', 140: '#BED8C8', 150: '#DCEBE0', 160: '#F0F7F2',
   }),
   fontFamilyBase: '"IBM Plex Sans", "Segoe UI", sans-serif',
-  colorNeutralForeground1: '#202823',
-  colorNeutralForeground2: '#59645E',
-  colorNeutralBackground1: '#FFFFFF',
-  colorNeutralBackground2: '#F5F7F6',
-  colorNeutralStroke1: '#C9D1CC',
+  fontSizeBase300: '15px',
+  lineHeightBase300: '22px',
+  borderRadiusMedium: '6px',
+  colorBrandBackground: 'var(--primary)',
+  colorBrandBackgroundHover: 'var(--primary-hover)',
+  colorBrandBackgroundPressed: 'var(--ink)',
+  colorBrandForeground1: 'var(--primary)',
+  colorNeutralForeground1: 'var(--text)',
+  colorNeutralForeground2: 'var(--muted)',
+  colorNeutralBackground1: 'var(--paper)',
+  colorNeutralBackground2: 'var(--surface)',
+  colorNeutralStroke1: 'var(--border)',
+  colorNeutralStrokeAccessible: 'var(--control-border)',
 };
 
 export function CatalogueTheme({ children }: { children: ReactNode }) {
-  return <FluentProvider theme={theme} className="catalogue-app">{children}</FluentProvider>;
+  return <FluentProvider theme={theme} className="enquiry-theme">{children}</FluentProvider>;
 }

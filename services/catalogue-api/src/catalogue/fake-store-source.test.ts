@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { catalogueFixture, product } from '../../../../tests/fixtures.js';
+import { catalogueFixture, fixturePhotoBase64, product } from '../../../../tests/fixtures.js';
 import { readConfig } from '../config.js';
 import { FakeStoreProductSource } from './fake-store-source.js';
 
@@ -7,13 +7,38 @@ function setup(response = Response.json(catalogueFixture())) {
   const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(response);
   const controller = new AbortController();
   const timeoutSignal = vi.fn<(milliseconds: number) => AbortSignal>().mockReturnValue(controller.signal);
-  const source = new FakeStoreProductSource(readConfig({}), { fetch, timeoutSignal });
-  return { source, fetch, timeoutSignal, controller };
+  const now = vi.fn(() => 0);
+  const source = new FakeStoreProductSource(readConfig({}), { fetch, timeoutSignal, now });
+  return { source, fetch, timeoutSignal, controller, now };
 }
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe('FakeStore product source', () => {
+  it.each([
+    ['image/png', Buffer.from(fixturePhotoBase64, 'base64')],
+    ['image/jpeg', Buffer.from([255, 216, 255, 224])],
+    ['image/webp', Buffer.from('RIFF0000WEBP')],
+  ] as const)('reads a bounded %s photo with the same deadline and redirect policy', async (contentType, bytes) => {
+    const { source, fetch, controller } = setup(new Response(Uint8Array.from(bytes), { headers: { 'Content-Type': contentType } }));
+    await expect(source.getPhoto(product().image)).resolves.toEqual({ contentType, bytes });
+    expect(fetch).toHaveBeenCalledExactlyOnceWith(product().image, expect.objectContaining({ redirect: 'error', signal: controller.signal }));
+  });
+
+  it('rejects an unapproved photo URL before making a request', async () => {
+    const { source, fetch } = setup();
+    await expect(source.getPhoto('https://example.test/img/jacket.png')).rejects.toMatchObject({ code: 'UPSTREAM_INVALID_DATA' });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['image/svg+xml', 'not a supported photo'], ['text/html', 'supplier message'],
+    ['image/png', 'wrong signature'], ['image/jpeg', new Uint8Array(4 * 1024 * 1024 + 1)],
+  ] as const)('rejects invalid or oversized photo bodies for %s', async (contentType, body) => {
+    const { source } = setup(new Response(body, { headers: { 'Content-Type': contentType } }));
+    await expect(source.getPhoto(product().image)).rejects.toMatchObject({ code: 'UPSTREAM_INVALID_DATA' });
+  });
+
   it('fetches only the fixed products URL with a 5-second signal and forbidden redirects', async () => {
     const { source, fetch, timeoutSignal, controller } = setup();
     expect(await source.getProducts()).toEqual(catalogueFixture());
@@ -33,14 +58,20 @@ describe('FakeStore product source', () => {
     expect(timeout).toHaveBeenCalledWith(5000);
   });
 
-  it('shares overlapping catalogue reads but fetches fresh data for the next read', async () => {
-    const { source, fetch } = setup();
+  it('shares reads, caches only for thirty seconds and bypasses the snapshot for an enquiry', async () => {
+    const { source, fetch, now } = setup();
     fetch.mockImplementation(async () => Response.json(catalogueFixture()));
     const [categoriesRead, featuredRead] = await Promise.all([source.getProducts(), source.getProducts()]);
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(categoriesRead).toEqual(featuredRead);
+    now.mockReturnValue(29999);
+    await source.getProducts();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    now.mockReturnValue(30000);
     await source.getProducts();
     expect(fetch).toHaveBeenCalledTimes(2);
+    await source.getProducts('fresh');
+    expect(fetch).toHaveBeenCalledTimes(3);
   });
 
   it('releases a failed shared read so a later request can recover', async () => {

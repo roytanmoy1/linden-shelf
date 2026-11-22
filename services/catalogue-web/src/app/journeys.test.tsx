@@ -1,40 +1,14 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import type userEvent from '@testing-library/user-event';
 import { ENQUIRY_BOUNDS } from '@linden-shelf/contracts';
-import { createMemoryRouter, RouterProvider } from 'react-router-dom';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { catalogueResponses, deferred, productsById } from '../../../../tests/fixtures.js';
-import { createApiClient } from '../api/client.js';
-import { createRoutes } from './routes.js';
-import { CatalogueTheme } from './theme.js';
-
-const routers: ReturnType<typeof createMemoryRouter>[] = [];
-afterEach(() => routers.splice(0).forEach((router) => router.dispose()));
-
-function setup(path = '/', overrides: Record<string, (options?: RequestInit) => Promise<Response>> = {}) {
-  const responses = catalogueResponses();
-  const fetcher = vi.fn<typeof fetch>(async (input, options) => {
-    const path = String(input);
-    const override = overrides[path];
-    if (override) return (await override(options)).clone();
-    if (!responses.has(path)) {
-      return Response.json({ error: { code: 'NOT_FOUND', message: 'Not found', details: null } }, { status: 404 });
-    }
-    return Response.json(responses.get(path));
-  });
-  const router = createMemoryRouter(createRoutes(createApiClient(fetcher)), { initialEntries: [path] });
-  routers.push(router);
-  render(<CatalogueTheme><RouterProvider router={router} /></CatalogueTheme>);
-  return { router, fetcher, responses, user: userEvent.setup() };
-}
-
-function productLinks() {
-  return within(screen.getByRole('main')).getAllByRole('link').filter((link) => link.getAttribute('href')?.startsWith('/products/'));
-}
+import { describe, expect, it, vi } from 'vitest';
+import { deferred, productsById } from '../../../../tests/fixtures.js';
+import { productLinks, renderCatalogue as setup } from '../../../../tests/web-harness.js';
+import '../product/enquiry.js';
 
 async function openEnquiry(user: ReturnType<typeof userEvent.setup>) {
   await user.click(await screen.findByRole('button', { name: 'Enquire' }));
-  return screen.getByRole('form', { name: 'Contact sales' });
+  return screen.findByRole('form', { name: 'Contact sales' }, { timeout: 10000 });
 }
 
 async function fillContact(user: ReturnType<typeof userEvent.setup>) {
@@ -43,6 +17,46 @@ async function fillContact(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('catalogue journeys with fake HTTP only', () => {
+  it('applies price and rating facets to the URL and restores them on Back', async () => {
+    const { user, responses, router } = setup('/search');
+    await screen.findByRole('heading', { name: 'All products' });
+    responses.set('/api/products?maxPrice=60&minRating=4&page=1', { products: productsById([2]), featuredIds: [],
+      pagination: { page: 1, pageSize: 8, pageCount: 1, total: 1 } });
+    await user.type(screen.getByRole('spinbutton', { name: /Maximum price/ }), '60');
+    await user.selectOptions(screen.getByRole('combobox', { name: /Minimum rating/ }), '4');
+    await user.click(screen.getByRole('button', { name: 'Apply filters' }));
+    await waitFor(() => expect(productLinks()).toHaveLength(1));
+    expect(router.state.location.search).toBe('?maxPrice=60&minRating=4');
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }));
+    await waitFor(() => expect(productLinks()).toHaveLength(7));
+    await act(() => router.navigate(-1));
+    expect(await screen.findByRole('spinbutton', { name: /Maximum price/ })).toHaveValue(60);
+  });
+
+  it('remembers submitted searches but not drafts and lets the customer clear them', async () => {
+    localStorage.clear();
+    const { user } = setup();
+    const field = await screen.findByRole('searchbox');
+    await user.type(field, '  cotton  {Enter}');
+    await screen.findByRole('heading', { name: 'Search results' });
+    await user.click(screen.getByRole('searchbox'));
+    const recent = screen.getByRole('region', { name: 'Recent searches' });
+    expect(within(recent).getByRole('link', { name: 'cotton' })).toHaveAttribute('href', '/search?q=cotton');
+    await user.click(within(recent).getByRole('button', { name: 'Clear history' }));
+    expect(localStorage.length).toBe(0);
+  });
+
+  it('keeps the current screen until the next navigation commits', async () => {
+    const pending = deferred<Response>();
+    const { user } = setup('/', { '/api/products?category=electronics&page=1': () => pending.promise });
+    await screen.findByRole('heading', { name: 'Top rated' });
+    await user.click(screen.getByRole('link', { name: 'electronics' }));
+    expect(screen.getByRole('main')).toHaveAttribute('aria-busy', 'true');
+    expect(productLinks()).toHaveLength(5);
+    await act(() => pending.resolve(Response.json({ products: productsById([11]), featuredIds: [11], pagination: { page: 1, pageSize: 8, pageCount: 1, total: 1 } })));
+    expect(await screen.findByRole('heading', { level: 1, name: 'electronics' })).toHaveFocus();
+  });
+
   it('renders exactly five semantic product links in server order and real category navigation', async () => {
     setup();
     expect(within(screen.getByRole('banner')).getByRole('link', { name: 'Linden Shelf' })).toHaveAttribute('href', '/');
@@ -51,8 +65,9 @@ describe('catalogue journeys with fake HTTP only', () => {
     expect(screen.getByRole('contentinfo')).toHaveTextContent('Linden Shelf');
     await waitFor(() => expect(document.title).toBe('Top rated | Linden Shelf'));
     expect(productLinks().map((link) => link.getAttribute('href'))).toEqual(['/products/3', '/products/5', '/products/11', '/products/18', '/products/20']);
+    expect(productLinks()[0]).toHaveAccessibleDescription(/^USD\s49\.50 2\.0 out of 5 from 10 reviews$/);
     const nav = screen.getByRole('navigation', { name: 'Categories' });
-    expect(within(nav).getAllByRole('link')).toHaveLength(5);
+    expect(within(nav).getAllByRole('link')).toHaveLength(6);
     expect(screen.getAllByRole('img')).toHaveLength(5);
     expect(screen.getAllByText('USD 49.50')).toHaveLength(5);
   });
@@ -70,9 +85,9 @@ describe('catalogue journeys with fake HTTP only', () => {
     const { router, responses } = setup('/category/electronics');
     await screen.findByRole('heading', { name: 'electronics', level: 1 });
     expect(screen.getByText('No more products in this category.')).toBeVisible();
-    responses.set('/api/products?category=electronics', { products: [], featuredIds: [] });
+    responses.set('/api/products?category=electronics&page=1', { products: [], featuredIds: [], pagination: { page: 1, pageSize: 8, pageCount: 1, total: 0 } });
     await act(() => router.revalidate());
-    expect(await screen.findByText('No featured products in this category.')).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'No matching products' })).toBeVisible();
   });
 
   it('sends no search requests while typing, submits via button/Enter, and restores URL state on back', async () => {
@@ -85,6 +100,8 @@ describe('catalogue journeys with fake HTTP only', () => {
     await screen.findByRole('heading', { name: 'Search results' });
     expect(router.state.location.search).toBe('?q=cotton');
     expect(productLinks().map((link) => link.getAttribute('href'))).toEqual(['/products/1', '/products/3', '/products/20']);
+    expect(screen.getAllByText('Selected').map((badge) => within(badge.closest('li')!).getByRole('link').getAttribute('href')))
+      .toEqual(['/products/3', '/products/20']);
     const query = screen.getByRole('searchbox', { name: 'Search products' });
     await user.clear(query);
     await user.type(query, 'telescope{Enter}');
@@ -149,14 +166,27 @@ describe('catalogue journeys with fake HTTP only', () => {
   it('renders full product metadata and handles unavailable photography without removing the link', async () => {
     const { user } = setup();
     await screen.findByRole('heading', { name: 'Top rated' });
-    fireEvent.error(screen.getAllByRole('img')[0]!);
+    const image = screen.getAllByRole('img')[0]!;
+    expect(image.parentElement).toHaveClass('image-pending');
+    fireEvent.load(image); expect(image.parentElement).not.toHaveClass('image-pending');
+    fireEvent.error(image);
     expect(screen.getByText('Image unavailable')).toBeVisible();
     await user.click(productLinks()[0]!);
     expect(await screen.findByRole('heading', { name: 'Cotton jacket', level: 1 })).toBeVisible();
     expect(screen.getByText('A woven outdoor layer')).toBeVisible();
     expect(screen.getByText('2.0 / 5 (10 reviews)')).toBeVisible();
-    expect(screen.getByRole('img', { name: 'Cotton jacket' })).toHaveAttribute('src', 'https://fakestoreapi.com/img/test-jacket.jpg');
+    expect(screen.getByRole('img', { name: 'Cotton jacket' })).toHaveAttribute('src', '/api/products/3/photo');
     expect(screen.getByText('USD 49.50')).toBeVisible();
+  });
+
+  it('keeps the originating results link and exposes structured product details', async () => {
+    const { user } = setup('/search?q=cotton');
+    await user.click(await screen.findByRole('link', { name: /Cotton jacket/ }));
+    await screen.findByRole('heading', { level: 1, name: 'Cotton jacket' });
+    expect(screen.getByRole('link', { name: 'Back to results' })).toHaveAttribute('href', '/search?q=cotton');
+    expect(screen.getByRole('heading', { name: 'About this item' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Product details' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Enlarge product photo' })).toBeVisible();
   });
 
   it('shows a replacement photo after the previous URL failed for the same product', async () => {
@@ -168,7 +198,22 @@ describe('catalogue journeys with fake HTTP only', () => {
     const [jacket] = productsById([3]);
     responses.set('/api/products/3', { product: { ...jacket, image } });
     await act(() => router.revalidate());
-    expect(screen.queryByRole('img', { name: 'Cotton jacket' })).toHaveAttribute('src', image);
+    expect(screen.getByRole('img', { name: 'Cotton jacket' })).toHaveAttribute('src', '/api/products/3/photo');
+  });
+
+  it('retries a failed detail photo without navigating or losing an enquiry draft', async () => {
+    const { user, router } = setup('/products/3');
+    const image = await screen.findByRole('img', { name: 'Cotton jacket' });
+    await openEnquiry(user);
+    await user.type(screen.getByRole('textbox', { name: /^Name/ }), 'Local Reviewer');
+    fireEvent.error(image);
+    await user.click(screen.getByRole('button', { name: 'Retry photo' }));
+    const retried = screen.getByRole('img', { name: 'Cotton jacket' });
+    expect(retried).not.toBe(image);
+    expect(retried).toHaveAttribute('src', '/api/products/3/photo');
+    expect(screen.getByRole('button', { name: 'Enlarge product photo' })).toHaveFocus();
+    expect(screen.getByRole('textbox', { name: /^Name/ })).toHaveValue('Local Reviewer');
+    expect(router.state.location.pathname).toBe('/products/3');
   });
 });
 

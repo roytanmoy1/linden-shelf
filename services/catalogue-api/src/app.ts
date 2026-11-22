@@ -1,5 +1,5 @@
 import { ENQUIRY_BOUNDS, enquirySchema, isJsonContentType, productIdParamSchema } from '@linden-shelf/contracts';
-import express from 'express';
+import express, { type Response } from 'express';
 import { rateLimit, type Store } from 'express-rate-limit';
 import type { CatalogueService } from './catalogue/catalogue-service.js';
 import type { EnquiryMailer } from './enquiries/enquiry-mailer.js';
@@ -11,6 +11,17 @@ interface AppDependencies {
   allowedOrigins: readonly string[];
   rateLimitStore?: Store;
   trustIngressProxy?: boolean;
+}
+
+function sendCatalogueRead(response: Response, body: unknown) {
+  if (!response.req.originalUrl.includes('?')) response.set('Cache-Control', 'private, max-age=15, must-revalidate');
+  response.json(body);
+}
+
+function productId(value: string) {
+  const id = productIdParamSchema.safeParse(value);
+  if (!id.success) throw new ApiError('BAD_REQUEST');
+  return id.data;
 }
 
 export function createApp({ catalogue, mailer, allowedOrigins, rateLimitStore, trustIngressProxy = false }: AppDependencies) {
@@ -59,11 +70,11 @@ export function createApp({ catalogue, mailer, allowedOrigins, rateLimitStore, t
   });
 
   app.get('/api/products/featured', async (_request, response) => {
-    response.json({ products: await catalogue.getFeatured() });
+    sendCatalogueRead(response, { products: await catalogue.getFeatured() });
   });
 
   app.get('/api/categories', async (_request, response) => {
-    response.json({ categories: await catalogue.getCategories() });
+    sendCatalogueRead(response, { categories: await catalogue.getCategories() });
   });
 
   app.get('/api/products', async (request, response) => {
@@ -71,9 +82,14 @@ export function createApp({ catalogue, mailer, allowedOrigins, rateLimitStore, t
   });
 
   app.get('/api/products/:id', async (request, response) => {
-    const id = productIdParamSchema.safeParse(request.params.id);
-    if (!id.success) throw new ApiError('BAD_REQUEST');
-    response.json({ product: await catalogue.getProduct(id.data) });
+    sendCatalogueRead(response, { product: await catalogue.getProduct(productId(request.params.id)) });
+  });
+
+  app.get('/api/products/:id/photo', async (request, response) => {
+    const photo = await catalogue.getPhoto(productId(request.params.id));
+    response.set('Content-Security-Policy', "default-src 'none'; sandbox");
+    response.set('Cache-Control', 'private, max-age=15, must-revalidate');
+    response.type(photo.contentType).send(photo.bytes);
   });
 
   app.post(enquiriesPath, (request, _response, next) => {
@@ -81,7 +97,7 @@ export function createApp({ catalogue, mailer, allowedOrigins, rateLimitStore, t
     next();
   }, express.json({ limit: ENQUIRY_BOUNDS.bodyBytes, strict: true, inflate: false }), async (request, response) => {
     const enquiry = enquirySchema.parse(request.body);
-    const product = await catalogue.getProduct(enquiry.productId);
+    const product = await catalogue.getProduct(enquiry.productId, 'fresh');
     await mailer.send(enquiry, product);
     response.json({ status: 'sent' });
   });

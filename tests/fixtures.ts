@@ -40,9 +40,17 @@ export function productsById(ids: readonly number[]) {
   });
 }
 
+export function pageFixture(all: Product[], selected: number[], page = 1) {
+  const pageSize = 8;
+  const pageCount = Math.max(1, Math.ceil(all.length / pageSize));
+  const products = all.slice((page - 1) * pageSize, page * pageSize);
+  return { products, featuredIds: selected.filter((id) => products.some((item) => item.id === id)),
+    pagination: { page, pageSize, pageCount, total: all.length } };
+}
+
 export function catalogueResponses(): Map<string, unknown> {
   const allProducts = { products: productsById([1, 2, 3, 5, 11, 18, 20]), featuredIds: [3, 5, 11, 18, 20] };
-  return new Map<string, unknown>([
+  const responses = new Map<string, unknown>([
     ['/api/categories', { categories: ['electronics', 'jewelery', "men's clothing", "women's clothing"] }],
     ['/api/products/featured', { products: productsById([3, 5, 11, 18, 20]) }],
     ['/api/products?category=men%27s+clothing', { products: productsById([3, 1, 2]), featuredIds: [3] }],
@@ -53,6 +61,14 @@ export function catalogueResponses(): Map<string, unknown> {
     ['/api/products', allProducts],
     ...catalogueFixture().map((product): [string, unknown] => [`/api/products/${product.id}`, { product }]),
   ]);
+  for (const [path, body] of [...responses]) {
+    const url = new URL(path, 'http://localhost');
+    if (url.pathname !== '/api/products') continue;
+    const listing = body as { products: Product[]; featuredIds: number[] };
+    url.searchParams.set('page', '1');
+    responses.set(url.pathname + url.search, pageFixture(listing.products, listing.featuredIds));
+  }
+  return responses;
 }
 
 export function deferred<Value>() {

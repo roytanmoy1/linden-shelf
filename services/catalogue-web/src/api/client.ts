@@ -1,5 +1,5 @@
 import {
-  catalogueQuerySchema, catalogueResponseSchema, categoriesResponseSchema,
+  catalogueParams, catalogueQuerySchema, catalogueResponseSchema, categoriesResponseSchema,
   enquiryResponseSchema, enquirySchema, errorResponseSchema, featuredProductsResponseSchema,
   isJsonContentType, productIdParamSchema, productResponseSchema,
   type CatalogueQuery, type CatalogueResponse, type CategoriesResponse, type Enquiry,
@@ -53,7 +53,7 @@ export function createApiClient(fetcher: typeof fetch = fetch): ApiClient {
     let response: Response;
     try {
       response = await fetcher(path, {
-        credentials: 'same-origin', redirect: 'error', cache: 'no-store',
+        credentials: 'same-origin', redirect: 'error', cache: 'default',
         headers: { Accept: 'application/json' }, ...options,
       });
     } catch {
@@ -92,8 +92,8 @@ export function createApiClient(fetcher: typeof fetch = fetch): ApiClient {
     list: async (query, signal) => {
       const result = catalogueQuerySchema.safeParse(query);
       if (!result.success) throw new ApiError('BAD_REQUEST');
-      const search = new URLSearchParams(result.data).toString();
-      return request(`/api/products${search ? `?${search}` : ''}`, catalogueResponseSchema, { signal: signal ?? null });
+      const search = catalogueParams(result.data).toString();
+      return request(`/api/products${search ? `?${search}` : ''}`, catalogueResponseSchema, { signal: signal ?? null, cache: 'no-store' });
     },
     getProduct: async (id, signal) => {
       const result = productIdParamSchema.safeParse(id);
@@ -104,7 +104,7 @@ export function createApiClient(fetcher: typeof fetch = fetch): ApiClient {
       const result = enquirySchema.safeParse(enquiry);
       if (!result.success) throw new ApiError('VALIDATION_ERROR');
       return request('/api/enquiries', enquiryResponseSchema, {
-        method: 'POST', signal: signal ?? null,
+        method: 'POST', signal: signal ?? null, cache: 'no-store',
         headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify(result.data),
       });

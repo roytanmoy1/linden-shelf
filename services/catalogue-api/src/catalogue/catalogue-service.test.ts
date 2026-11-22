@@ -3,13 +3,37 @@ import { describe, expect, it, vi } from 'vitest';
 import { catalogueFixture, product } from '../../../../tests/fixtures.js';
 import { readConfig } from '../config.js';
 import { CatalogueService } from './catalogue-service.js';
+import type { ProductSource } from './product-source.js';
 
 function setup(products: Product[] = catalogueFixture(), environment: NodeJS.ProcessEnv = {}) {
-  const source = { getProducts: vi.fn<() => Promise<Product[]>>().mockResolvedValue(products) };
+  const source = { getProducts: vi.fn<() => Promise<Product[]>>().mockResolvedValue(products), getPhoto: vi.fn<ProductSource['getPhoto']>() };
   return { source, catalogue: new CatalogueService(source, readConfig(environment).featuredProductIds) };
 }
 
 describe('editorial catalogue', () => {
+  it('filters before sorting and paging, with stable ties and no mutation', async () => {
+    const items = Array.from({ length: 20 }, (_, index) => product({ id: index + 1, price: Math.floor(index / 2) * 10,
+      rating: { rate: index % 3 === 0 ? 2 : 5, count: 10 } }));
+    const { catalogue } = setup(items);
+    const query = { minPrice: '10', maxPrice: '90', minRating: '4', sort: 'price-desc' };
+    const first = await catalogue.list({ ...query, page: '1' });
+    const last = await catalogue.list({ ...query, page: '999' });
+    expect(first.products.map((item) => item.id)).toEqual([20, 17, 18, 15, 14, 11, 12, 9]);
+    expect(last.products.map((item) => item.id)).toEqual([8, 5, 6, 3]);
+    expect(last.pagination).toEqual({ page: 2, pageSize: 8, pageCount: 2, total: 12 });
+    expect((await catalogue.list({ featured: '1', sort: 'price-asc' })).products.map((item) => item.id)).toEqual([3, 5, 11, 18, 20]);
+    expect((await catalogue.list({ sort: 'rating-desc' })).products[0]?.id).toBe(2);
+    expect((await catalogue.list({ sort: 'title-asc', minPrice: '999', page: '1' })).pagination?.total).toBe(0);
+    expect(items[0]?.id).toBe(1);
+  });
+
+  it.each([{ minPrice: '-1' }, { minPrice: '12', maxPrice: '11' }, { maxPrice: '1e2' }, { minRating: '6' },
+    { sort: 'unknown' }, { page: '0' }, { page: '1000' }, { featured: 'yes' }])('rejects bad filters without supplier IO: %j', async (query) => {
+    const { catalogue, source } = setup();
+    await expect(catalogue.list(query)).rejects.toThrow();
+    expect(source.getProducts).not.toHaveBeenCalled();
+  });
+
   it('uses the owner-selected membership and order for both the home and category pages', async () => {
     const { catalogue } = setup(catalogueFixture(), { FEATURED_PRODUCT_IDS: '2, 11, 1, 5, 18' });
     expect((await catalogue.getFeatured()).map((item) => item.id)).toEqual([2, 11, 1, 5, 18]);

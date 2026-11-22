@@ -5,10 +5,9 @@ import '@fontsource/ibm-plex-sans/latin-400.css';
 import '@fontsource/ibm-plex-sans/latin-500.css';
 import '@fontsource/ibm-plex-sans/latin-600.css';
 import { createRoutes } from './app/routes.js';
-import { CatalogueTheme } from './app/theme.js';
 import './app/catalogue.css';
 
 const router = createBrowserRouter(createRoutes());
 createRoot(document.getElementById('root')!).render(
-  <StrictMode><CatalogueTheme><RouterProvider router={router} /></CatalogueTheme></StrictMode>,
+  <StrictMode><div className="catalogue-app"><RouterProvider router={router} /></div></StrictMode>,
 );

@@ -96,6 +96,10 @@ jobs:
           docker compose -f compose.yaml -f tests/compose.reviewer.yaml up --no-build --wait
           npm run test:acceptance | tee "$RUNNER_TEMP/reviewer-controlled.log"
           grep -E '^(Compose build|Passed:)' "$RUNNER_TEMP/reviewer-controlled.log" >> "$GITHUB_STEP_SUMMARY"
+      - name: Check desktop, tablet and phone journeys against production web assets
+        env:
+          BROWSER_BASE_URL: http://127.0.0.1:3000
+        run: npm run test:browser
       - name: Diagnose an unsuccessful stack check
         if: failure()
         run: |

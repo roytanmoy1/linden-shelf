@@ -3,9 +3,10 @@ import { errorResponseSchema, type ErrorCode, type Product } from '@linden-shelf
 import { MemoryStore } from 'express-rate-limit';
 import request, { type Response as TestResponse } from 'supertest';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { catalogueFixture, deferred, enquiry } from '../../../tests/fixtures.js';
+import { catalogueFixture, deferred, enquiry, fixturePhotoBase64 } from '../../../tests/fixtures.js';
 import { createApp } from './app.js';
 import { CatalogueService } from './catalogue/catalogue-service.js';
+import type { ProductSource } from './catalogue/product-source.js';
 import { readConfig } from './config.js';
 import type { EnquiryMailer } from './enquiries/enquiry-mailer.js';
 import { SmtpEnquiryMailer, type SmtpDelivery, type SmtpTransport } from './enquiries/smtp-mailer.js';
@@ -14,7 +15,12 @@ import { ApiError } from './http/errors.js';
 const stores: MemoryStore[] = [];
 
 function setup(mailer?: EnquiryMailer, trustIngressProxy = false) {
-  const source = { getProducts: vi.fn<() => Promise<Product[]>>().mockResolvedValue(catalogueFixture()) };
+  const source = {
+    getProducts: vi.fn<() => Promise<Product[]>>().mockResolvedValue(catalogueFixture()),
+    getPhoto: vi.fn<ProductSource['getPhoto']>().mockResolvedValue({
+      bytes: Buffer.from(fixturePhotoBase64, 'base64'), contentType: 'image/png',
+    }),
+  };
   const send = vi.fn<EnquiryMailer['send']>().mockResolvedValue(undefined);
   const rateLimitStore = new MemoryStore();
   stores.push(rateLimitStore);
@@ -40,6 +46,20 @@ afterEach(() => {
 });
 
 describe('HTTP catalogue boundary (local ephemeral HTTP, fake external dependencies)', () => {
+  it('limits browser caching to successful public reads and always resolves enquiries fresh', async () => {
+    const { app, source } = setup();
+    for (const path of ['/api/categories', '/api/products/featured', '/api/products/3']) {
+      expect((await request(app).get(path)).headers['cache-control']).toBe('private, max-age=15, must-revalidate');
+    }
+    for (const path of ['/api/products?q=cotton', '/api/products/999']) {
+      expect((await request(app).get(path)).headers['cache-control']).toBe('no-store');
+    }
+    const response = await request(app).post('/api/enquiries').send(enquiry({ productId: 3 }));
+    expect(response.status).toBe(200);
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(source.getProducts).toHaveBeenLastCalledWith('fresh');
+  });
+
   it('serves process health without source or mail IO', async () => {
     const { app, source, send } = setup();
     const response = await request(app).get('/api/health');
@@ -66,6 +86,19 @@ describe('HTTP catalogue boundary (local ephemeral HTTP, fake external dependenc
     const response = await request(app).get('/api/categories');
     expect(response.body).toEqual({ categories: ['electronics', 'jewelery', "men's clothing", "women's clothing"] });
     expect(source.getProducts).toHaveBeenCalledTimes(1);
+  });
+
+  it('serves photo bytes by catalogue ID and never delegates an unknown or invalid ID', async () => {
+    const { app, source } = setup();
+    const response = await request(app).get('/api/products/3/photo');
+    expect(response.status).toBe(200);
+    expect(response.headers['content-type']).toBe('image/png');
+    expect(response.headers['x-content-type-options']).toBe('nosniff');
+    expect(response.body).toEqual(Buffer.from(fixturePhotoBase64, 'base64'));
+    expect(source.getPhoto).toHaveBeenCalledExactlyOnceWith('https://fakestoreapi.com/img/test-jacket.jpg');
+    expectError(await request(app).get('/api/products/999/photo'), 404, 'NOT_FOUND');
+    expectError(await request(app).get('/api/products/0/photo'), 400, 'BAD_REQUEST');
+    expect(source.getPhoto).toHaveBeenCalledTimes(1);
   });
 
   it.each([

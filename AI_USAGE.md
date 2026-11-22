@@ -1,16 +1,11 @@
 # AI Usage
 
-Assistant: GitHub Copilot. No underlying model identity is asserted. Human code
-review is pending; automated checks are not a substitute for that review.
-
-Tools used: GitHub Copilot in VS Code, planning/scaffolding agents, local terminal
-and file tools, and browser/Playwright checks. GitHub access during implementation
-was read-only; the owner separately authorized the final feature-branch push.
-Project-specific direction
-is retained in [.github/copilot-instructions.md](.github/copilot-instructions.md).
-The selected underlying model
-identifier was not recorded; confirm it from the tool UI before submission rather
-than inventing one.
+Tool: GitHub Copilot in VS Code, including planning/scaffolding agents, terminal
+and file tools, and Playwright browser checks. The saved editor session records
+two model selections: `copilot/gpt-6-astra` and `copilot/gpt-6.2-astra`.
+These are the editor's recorded identifiers; individual subagent calls are not
+attributed to a particular model. Project-specific directions are in
+[.github/copilot-instructions.md](.github/copilot-instructions.md).
 
 ## Plan Used
 
@@ -27,8 +22,8 @@ These are paraphrases of real directions and checkpoints, not invented quotation
 1. Read the brief and plan before building. The wording about five *chosen* products led to an explicit ordered list rather than an algorithm that silently changes the owner's picks.
 2. Work through each journey locally; do not publish yet. The implementation uses portable containers and an account-free inbox. No hosting deployment was substituted for the requested open PR.
 3. Prove email, not just a success screen. We stopped SMTP, observed a 503 with the form intact, restored Mailpit, retried and inspected the received message. The mocked UI tests alone could not establish this.
-4. Review security, performance and duplication. A failing two-reader test showed the home page could fetch the same supplier dataset twice. Sharing only an unfinished read fixed it without caching a stale price or a failure.
-5. Audit all four PDF pages and make the choices explainable. The [walkthrough](docs/interview.md) traces the real code. A follow-up acceptance test demonstrated that changing the operator's pick list had no effect on the old hardcoded selection. Backend configuration and a real browser-to-Mailpit check now cover that gap.
+4. Review security, performance and duplication. A failing two-reader test exposed duplicate supplier reads. The later local browse redesign adds one short-lived validated snapshot; sending an enquiry bypasses it. A production-browser test traced a blocked code-generation probe to Zod; browser-only jitless validation fixed it without weakening CSP.
+5. Audit all four pages against a fresh reviewer's journey. This caught a hardcoded pick list and a later assumption that supplier-hosted photo bytes were exempt from the backend constraint. Picks now come from configuration, and the real browser check requires same-origin photos and an actual Mailpit receipt. The [walkthrough](docs/interview.md) traces both paths.
 
 ## A Mistake We Caught
 
@@ -51,4 +46,7 @@ API 502. The test now separates that observation from deterministic browser,
 nginx and SMTP acceptance; it neither bypasses the refusal nor changes production data.
 
 See [verification evidence](docs/acceptance.md) and the [time log](docs/time-log.md).
-The private assessment, workstation settings and any credentials are excluded.
+Project-specific instructions live in one file; no additional custom skill or
+agent was needed. The private assessment, workstation settings and credentials
+are excluded. Automated checks verify behavior; they do not substitute for the
+candidate's own review and interview preparation.

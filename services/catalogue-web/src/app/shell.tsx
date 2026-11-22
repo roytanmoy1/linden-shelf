@@ -1,9 +1,10 @@
-import { Button, Input, MessageBar, MessageBarBody, Skeleton, SkeletonItem } from '@fluentui/react-components';
-import { CATALOGUE_BOUNDS, type CategoriesResponse } from '@linden-shelf/contracts';
-import { ArrowLeft, RefreshCw, Search } from 'lucide-react';
-import { Form, Link, NavLink, Outlet, useLoaderData, useLocation, useNavigation, useRevalidator, useRouteError } from 'react-router-dom';
+import type { CategoriesResponse } from '@linden-shelf/contracts';
+import { ArrowLeft, LayoutGrid, RefreshCw } from 'lucide-react';
+import { useEffect, useRef } from 'react';
+import { Link, NavLink, Outlet, ScrollRestoration, useLoaderData, useLocation, useNavigation, useRevalidator, useRouteError } from 'react-router-dom';
 import { ApiError } from '../api/client.js';
-import { PageHeading, SITE_NAME } from './page-heading.js';
+import { PageHeading, SITE_NAME, type ProductReturnTarget } from './page-heading.js';
+import { SearchBar } from './search-bar.js';
 
 export interface ShellData extends CategoriesResponse { categoryError: string | null }
 
@@ -12,14 +13,14 @@ function BrandLink() {
 }
 
 export function LoadingCatalogue() {
+  const detail = useLocation().pathname.startsWith('/products/');
   return <div className="loading-catalogue" role="status" aria-label="Loading catalogue" aria-busy="true">
-    <span className="muted">Loading catalogue...</span>
-    <Skeleton className="product-grid" aria-hidden="true" animation="pulse">
-      {[1, 2, 3, 4, 5].map((index) => <div className="loading-tile" key={index}>
-        <SkeletonItem className="loading-media" shape="rectangle" />
-        <SkeletonItem size={16} /><SkeletonItem size={12} />
+    <span className="visually-hidden">Loading catalogue...</span>
+    <div className={detail ? 'detail-placeholder' : 'product-grid'} aria-hidden="true">
+      {(detail ? [1] : [1, 2, 3, 4, 5]).map((index) => <div className="loading-tile" key={index}>
+        <span className="loading-media" /><span className="loading-line" /><span className="loading-line short" />
       </div>)}
-    </Skeleton>
+    </div>
   </div>;
 }
 
@@ -31,6 +32,13 @@ export function InitialLoading() {
 export function Shell() {
   const { categories, categoryError } = useLoaderData<ShellData>();
   const location = useLocation();
+  const lastProduct = useRef<ProductReturnTarget | null>(null);
+  useEffect(() => {
+    if (location.pathname.startsWith('/products/')) {
+      const entryKey: unknown = location.state?.browseKey;
+      lastProduct.current = typeof entryKey === 'string' ? { entryKey, path: location.pathname } : null;
+    }
+  }, [location]);
   const navigation = useNavigation();
   const revalidator = useRevalidator();
   const loading = navigation.state === 'loading';
@@ -40,28 +48,23 @@ export function Shell() {
     <header className="site-header">
       <div className="header-inner">
         <BrandLink />
-        <Form className="search-form" role="search" aria-label="Catalogue search" method="get" action="/search">
-          <label className="visually-hidden" htmlFor="catalogue-search">Search products</label>
-          <Input id="catalogue-search" name="q" type="search" className="search-input" size="large"
-            key={`${location.pathname}${location.search}`} defaultValue={new URLSearchParams(location.search).get('q') ?? ''}
-            maxLength={CATALOGUE_BOUNDS.query} placeholder="Search products" />
-          <Button type="submit" appearance="primary" size="large" icon={<Search aria-hidden="true" size={18} />}>Search</Button>
-        </Form>
+        <SearchBar />
       </div>
     </header>
-    <div className="navigation-band">
-      <nav className="category-nav" aria-label="Categories">
+    <div className="navigation-band"><nav className="nav-inner" aria-label="Categories"><NavLink to="/search" className="browse-link"><LayoutGrid size={16} aria-hidden="true" />All products</NavLink>
+      <div className="category-nav">
         <NavLink to="/" end>Top rated</NavLink>
         {categories.map((category) => <NavLink key={category} to={`/category/${encodeURIComponent(category)}`}>{category}</NavLink>)}
-      </nav>
+      </div></nav>
       {categoryError && <div className="navigation-error">
-        <MessageBar intent="error" role="alert"><MessageBarBody>Categories are unavailable.</MessageBarBody></MessageBar>
-        <Button icon={<RefreshCw size={16} aria-hidden="true" />} disabled={revalidator.state !== 'idle'}
-          onClick={() => void revalidator.revalidate()}>Retry categories</Button>
+        <p role="alert">Categories are unavailable.</p>
+        <button className="secondary-control" type="button" disabled={revalidator.state !== 'idle'} onClick={() => void revalidator.revalidate()}><RefreshCw size={16} aria-hidden="true" />Retry categories</button>
       </div>}
     </div>
-    <main id="main" className="page-content" aria-busy={loading}>{loading ? <LoadingCatalogue /> : <Outlet />}</main>
+    <span className="visually-hidden" aria-live="polite" aria-atomic="true">{loading ? 'Loading next page' : ''}</span>
+    <main id="main" tabIndex={-1} className="page-content" aria-busy={loading}><Outlet context={lastProduct} /></main>
     <footer className="site-footer"><span>{SITE_NAME}</span><Link to="/search">All products</Link></footer>
+    <ScrollRestoration storageKey="linden:scroll:v1" />
   </div>;
 }
 
@@ -73,10 +76,10 @@ export function RouteError() {
   const invalid = failure.code === 'BAD_REQUEST';
   return <section className="page-error">
     <PageHeading>{missing ? 'Not found' : invalid ? 'Invalid address' : 'Unable to load catalogue'}</PageHeading>
-    <MessageBar intent="error" role="alert"><MessageBarBody>{failure.message}</MessageBarBody></MessageBar>
+    <p className="public-alert" role="alert">{failure.message}</p>
     <div className="action-row">
-      {!missing && !invalid && <Button appearance="primary" icon={<RefreshCw size={18} aria-hidden="true" />}
-        disabled={revalidator.state !== 'idle'} onClick={() => void revalidator.revalidate()}>Retry</Button>}
+      {!missing && !invalid && <button type="button" className="primary-control"
+        disabled={revalidator.state !== 'idle'} onClick={() => void revalidator.revalidate()}><RefreshCw size={18} aria-hidden="true" />Retry</button>}
       <Link to="/" className="inline-link"><ArrowLeft size={16} aria-hidden="true" />Back to top rated</Link>
     </div>
   </section>;

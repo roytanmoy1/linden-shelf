@@ -1,8 +1,9 @@
 import { Button, Field, Input, MessageBar, MessageBarBody, Textarea } from '@fluentui/react-components';
 import { ENQUIRY_BOUNDS, enquirySchema, type Product } from '@linden-shelf/contracts';
-import { CheckCircle2, Mail, Send } from 'lucide-react';
+import { CheckCircle2, Send } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ApiError, type ApiClient } from '../api/client.js';
+import { CatalogueTheme } from '../app/theme.js';
 
 const validationMessages = {
   name: `Enter a valid name (1-${ENQUIRY_BOUNDS.name} characters).`,
@@ -11,21 +12,19 @@ const validationMessages = {
 };
 type ContactField = keyof typeof validationMessages;
 
-export function Enquiry({ product, client }: { product: Product; client: ApiClient }) {
-  const [open, setOpen] = useState(false);
+export function Enquiry({ product, client, onCancel }: { product: Product; client: ApiClient; onCancel: () => void }) {
   const [pending, setPending] = useState(false);
   const [sent, setSent] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<ContactField, string>>>({});
   const [failure, setFailure] = useState<ApiError | null>(null);
-  const actionsRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const confirmationRef = useRef<HTMLHeadingElement>(null);
   const activeRequest = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    if (open && !sent) formRef.current?.querySelector<HTMLElement>('[name="name"]')?.focus();
     if (sent) confirmationRef.current?.focus();
-  }, [open, sent]);
+    else formRef.current?.querySelector<HTMLElement>('[name="name"]')?.focus();
+  }, [sent]);
   useEffect(() => () => activeRequest.current?.abort(), []);
   useEffect(() => {
     const first = Object.keys(errors)[0];
@@ -67,20 +66,15 @@ export function Enquiry({ product, client }: { product: Product; client: ApiClie
     }
   }
 
-  if (sent) return <section className="enquiry-confirmation" aria-labelledby="enquiry-confirmation">
+  if (sent) return <CatalogueTheme><section className="enquiry-confirmation" aria-labelledby="enquiry-confirmation">
     <h2 id="enquiry-confirmation" tabIndex={-1} ref={confirmationRef}>Thank you</h2>
     <MessageBar intent="success" role="status" icon={<CheckCircle2 size={20} aria-hidden="true" />}>
       <MessageBarBody>Your enquiry has been sent to our sales team.</MessageBarBody>
     </MessageBar>
-  </section>;
+  </section></CatalogueTheme>;
 
   const retryMinutes = failure?.retryAfterSeconds ? Math.ceil(failure.retryAfterSeconds / 60) : null;
-  return <div className="enquiry-section">
-    <div className="detail-actions" ref={actionsRef}>
-      <Button appearance="primary" size="large" icon={<Mail size={18} aria-hidden="true" />}
-        aria-expanded={open} aria-controls={open ? 'enquiry-form' : undefined} onClick={() => setOpen(true)}>Enquire</Button>
-    </div>
-    {open && <form id="enquiry-form" ref={formRef} className="enquiry-form" aria-labelledby="enquiry-heading"
+  return <CatalogueTheme><form id="enquiry-form" ref={formRef} className="enquiry-form" aria-labelledby="enquiry-heading"
       noValidate aria-busy={pending} onSubmit={(event) => void submit(event)}>
       <h2 id="enquiry-heading">Contact sales</h2>
       {failure && <MessageBar intent="error" role="alert"><MessageBarBody>
@@ -101,14 +95,8 @@ export function Enquiry({ product, client }: { product: Product; client: ApiClie
       <div className="action-row">
         <Button type="submit" appearance="primary" icon={<Send size={17} aria-hidden="true" />} disabled={pending}>
           {pending ? 'Sending...' : 'Send enquiry'}</Button>
-        <Button type="button" disabled={pending} onClick={() => {
-          setOpen(false);
-          setErrors({});
-          setFailure(null);
-          actionsRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
-        }}>Cancel</Button>
+        <Button type="button" disabled={pending} onClick={onCancel}>Cancel</Button>
       </div>
       {pending && <span className="visually-hidden" role="status">Sending enquiry...</span>}
-    </form>}
-  </div>;
+    </form></CatalogueTheme>;
 }

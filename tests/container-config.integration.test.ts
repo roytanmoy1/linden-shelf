@@ -53,6 +53,7 @@ describe('container configuration (static checks, not a Docker runtime test)', (
 
   it('prevents framing the catalogue and enquiry form', () => {
     expect(nginx).toMatch(/add_header Content-Security-Policy "[^"]*frame-ancestors 'none'[^"]*" always;/);
+    expect(nginx).toContain("img-src 'self';");
   });
 
   it('negotiates gzip only for public static bundles', () => {
@@ -112,6 +113,9 @@ describe('container configuration (static checks, not a Docker runtime test)', (
     expect(commands).toContain('docker compose up --build --wait');
     expect(commands).toContain('npm run test:acceptance');
     expect(commands).toContain('docker compose stop api');
+    expect(steps).toContainEqual(expect.objectContaining({
+      run: 'npm run test:browser', env: { BROWSER_BASE_URL: 'http://127.0.0.1:3000' },
+    }));
     expect(steps).toContainEqual(expect.objectContaining({ if: 'always()', run: 'docker compose down' }));
   });
 

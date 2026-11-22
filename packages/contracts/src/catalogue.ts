@@ -1,7 +1,13 @@
 import { z } from 'zod';
 
+if ('document' in globalThis) z.config({ jitless: true });
+
 export const CATALOGUE_BOUNDS = { title: 300, description: 10000, category: 100, query: 200 } as const;
 export const FEATURED_COUNT = 5;
+export const PAGE_SIZE = 8;
+const MAX_PRODUCTS = 1000;
+export const pageCountFor = (total: number) => Math.max(1, Math.ceil(total / PAGE_SIZE));
+export const sortLabels = { 'price-asc': 'Price: low to high', 'price-desc': 'Price: high to low', 'rating-desc': 'Highest rated', 'title-asc': 'Name: A to Z' } as const;
 export const productIdSchema = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
 export const productIdParamSchema = z.string().regex(/^[1-9]\d*$/).transform(Number).pipe(productIdSchema);
 
@@ -25,22 +31,41 @@ export const productSchema = z.object({
   }),
 });
 
-export const catalogueSchema = z.array(productSchema).min(1).max(1000).refine(
+export const catalogueSchema = z.array(productSchema).min(1).max(MAX_PRODUCTS).refine(
   (products) => new Set(products.map((product) => product.id)).size === products.length,
   { message: 'Product IDs must be unique.' },
 );
 
+const priceParam = z.string().regex(/^(0|[1-9]\d{0,8})(\.\d{1,2})?$/);
 export const catalogueQuerySchema = z.strictObject({
   category: z.string().trim().max(CATALOGUE_BOUNDS.category).optional(),
   q: z.string().trim().max(CATALOGUE_BOUNDS.query).optional(),
-}).transform(({ category, q: queryText }) => ({
+  minPrice: priceParam.optional(), maxPrice: priceParam.optional(),
+  minRating: z.enum(['1', '2', '3', '4', '5']).optional(), featured: z.literal('1').optional(),
+  sort: z.enum(Object.keys(sortLabels) as [keyof typeof sortLabels, ...(keyof typeof sortLabels)[]]).optional(),
+  page: z.string().regex(/^[1-9]\d{0,2}$/).optional(),
+}).refine((query) => query.minPrice === undefined || query.maxPrice === undefined || Number(query.minPrice) <= Number(query.maxPrice),
+  { path: ['maxPrice'], message: 'Maximum price must not be lower than minimum price.' }).transform(({ category, q: queryText, ...filters }) => ({
   ...(category ? { category } : {}),
   ...(queryText === undefined ? {} : { q: queryText }),
+  ...filters,
 }));
+
+export function catalogueParams(query: CatalogueQuery) {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) if (value !== undefined) params.set(key, value);
+  return params;
+}
 
 export const productResponseSchema = z.object({ product: productSchema });
 export const featuredProductsResponseSchema = z.object({ products: z.array(productSchema).length(FEATURED_COUNT) });
-export const catalogueResponseSchema = z.object({ products: z.array(productSchema), featuredIds: z.array(productIdSchema) });
+export const catalogueResponseSchema = z.object({ products: z.array(productSchema).max(MAX_PRODUCTS), featuredIds: z.array(productIdSchema).max(FEATURED_COUNT),
+  pagination: z.object({ page: z.number().int().positive(), pageCount: z.number().int().positive(),
+    total: z.number().int().min(0).max(MAX_PRODUCTS), pageSize: z.literal(PAGE_SIZE) }).optional(),
+}).refine(({ pagination, products }) => !pagination || (
+  pagination.page <= pagination.pageCount && pagination.pageCount === pageCountFor(pagination.total)
+  && products.length === Math.min(PAGE_SIZE, pagination.total - (pagination.page - 1) * PAGE_SIZE)
+));
 export const categoriesResponseSchema = z.object({ categories: z.array(categorySchema) });
 
 export type Product = z.infer<typeof productSchema>;

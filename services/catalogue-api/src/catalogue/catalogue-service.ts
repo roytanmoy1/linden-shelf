@@ -1,6 +1,13 @@
-import { catalogueQuerySchema, type CatalogueResponse, type Product } from '@linden-shelf/contracts';
+import { catalogueQuerySchema, pageCountFor, PAGE_SIZE, type CatalogueQuery, type CatalogueResponse, type Product } from '@linden-shelf/contracts';
 import { ApiError } from '../http/errors.js';
 import type { ProductSource } from './product-source.js';
+
+const comparisons: Record<NonNullable<CatalogueQuery['sort']>, (first: Product, second: Product) => number> = {
+  'price-asc': (first, second) => first.price - second.price,
+  'price-desc': (first, second) => second.price - first.price,
+  'rating-desc': (first, second) => second.rating.rate - first.rating.rate,
+  'title-asc': (first, second) => first.title.localeCompare(second.title, 'en'),
+};
 
 export class CatalogueService {
   constructor(private readonly source: ProductSource, private readonly featuredProductIds: readonly number[]) {}
@@ -30,27 +37,42 @@ export class CatalogueService {
       }
       throw parsed.error;
     }
-    const { category, q: queryText } = parsed.data;
+    const { category, q: queryText, minPrice, maxPrice, minRating, featured, sort, page } = parsed.data;
     const allProducts = await this.source.getProducts();
     if (category && !allProducts.some((product) => product.category === category)) {
       throw new ApiError('NOT_FOUND');
     }
     const query = queryText?.toLowerCase() ?? '';
-    const matches = (product: Product) => (!category || product.category === category)
-      && (!query || [product.title, product.description, product.category].some((field) => field.toLowerCase().includes(query)));
-    const featured = this.selectFeatured(allProducts).filter(matches);
-    const featuredIds = featured.map((product) => product.id);
-    const sorted = allProducts.filter(matches).sort((first, second) => first.id - second.id);
-    const products = category
-      ? [...featured, ...sorted.filter((product) => !featuredIds.includes(product.id))]
-      : sorted;
-    return { products, featuredIds };
+    const picks = this.selectFeatured(allProducts);
+    const picked = new Set(picks.map((item) => item.id));
+    const floor = Number(minPrice ?? 0), ceiling = Number(maxPrice ?? Infinity), stars = Number(minRating ?? 0);
+    const matched = allProducts.filter((product) => (!category || product.category === category)
+      && product.price >= floor && product.price <= ceiling && product.rating.rate >= stars
+      && (!featured || picked.has(product.id))
+      && (!query || [product.title, product.description, product.category].some((field) => field.toLowerCase().includes(query))));
+    const compare = sort && comparisons[sort];
+    matched.sort((first, second) => compare?.(first, second) || first.id - second.id);
+    const matchingIds = new Set(matched.map((item) => item.id));
+    const selected = picks.filter((item) => matchingIds.has(item.id));
+    const ordered = category && !sort ? [...selected, ...matched.filter((item) => !picked.has(item.id))] : matched;
+    const featuredIds = selected.map((item) => item.id);
+    if (!page) return { products: ordered, featuredIds };
+    const pageCount = pageCountFor(ordered.length);
+    const current = Math.min(Number(page), pageCount);
+    const products = ordered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
+    return { products, featuredIds: products.filter((item) => picked.has(item.id)).map((item) => item.id),
+      pagination: { page: current, pageCount, pageSize: PAGE_SIZE, total: ordered.length } };
   }
 
-  async getProduct(id: number): Promise<Product> {
-    const products = await this.source.getProducts();
+  async getProduct(id: number, mode?: 'fresh'): Promise<Product> {
+    const products = await this.source.getProducts(mode);
     const product = products.find((candidate) => candidate.id === id);
     if (!product) throw new ApiError('NOT_FOUND');
     return product;
+  }
+
+  async getPhoto(id: number) {
+    const product = await this.getProduct(id);
+    return this.source.getPhoto(product.image);
   }
 }

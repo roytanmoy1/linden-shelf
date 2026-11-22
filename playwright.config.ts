@@ -19,8 +19,9 @@ export default defineConfig({
   },
   projects: [
     { name: 'desktop', use: { viewport: { width: 1440, height: 1000 } } },
-    { name: 'mobile-390', use: { viewport: { width: 390, height: 844 } } },
-    { name: 'mobile-320', use: { viewport: { width: 320, height: 740 }, reducedMotion: 'reduce' } },
+    { name: 'tablet-820', use: { viewport: { width: 820, height: 1180 }, isMobile: true, hasTouch: true } },
+    { name: 'mobile-390', use: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } },
+    { name: 'mobile-320', use: { viewport: { width: 320, height: 740 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' } },
   ],
   ...(externalBaseUrl ? {} : { webServer: {
     command: `npm --prefix services/catalogue-web run dev -- --port ${port}`,

@@ -1,22 +1,19 @@
-# Assessment Checklist
+# Reviewer Verification
 
-All four pages of the private brief were checked on 22 November 2026. This is
-evidence for the local product, not a claim that a submission email was sent.
+All four pages of the brief were checked against the feature branch on
+22 November 2026. Start with the [quickstart](../README.md) and the
+[open PR](https://github.com/roytanmoy1/linden-shelf/pull/1). `main` is the
+README-only baseline; the implementation is on `feature/catalogue`.
 
 ## Customer Journeys
 
-| Requirement | Observed Evidence | Still Pending |
-| --- | --- | --- |
-| Five editorial products | Default picks and a different set/order were exercised against a real API; invalid counts, duplicates and invalid IDs fail startup | Final human review |
-| Category ordering | The reviewer command visits every category and compares its featured and remaining IDs, in order, against the catalogue; no duplicate or foreign tiles | Final human review |
-| Explicit search | The reviewer command verifies zero tiles for a no-match term and the exact matching IDs after a mixed-case, padded search; isolated tests also cover Enter, Back and no requests while typing | Final human review |
-| Product detail | Invalid/absent/unknown route tests; deep-link refresh; live title, description, USD price, rating and image | Final human review |
-| Enquiry UI and delivery | Invalid contact details do not confirm; real SMTP-stopped 503 retains fields; the successful journey verifies thank-you and one uniquely marked message, recipient, Reply-To and server-resolved product/price | External mailbox delivery is outside local acceptance; human review |
-| Metadata boundary | The real browser journey observes requests and rejects external metadata access; direct supplier photos are allowed only under `/img/` | Review the latest hosted job |
-| Proxy limiter | Test-first independent client quotas in explicit one-hop mode; native spoofing still ignored; nginx sanitization statically checked | nginx/Docker runtime forwarding probe |
-| Responsive/accessibility | Nine Playwright fixture journeys at 1440/390/320px, Axe scans, keyboard/focus, no overflow; live 390/320px layout and reduced motion checked | Human assistive-technology review |
-| Local reproducibility | Native clean-checkout timing below; the Linux `reviewer` job builds Compose, measures time through five visible tiles, checks nginx and verifies graceful API shutdown | See the latest PR run for actual results. Image vulnerability scanning is a separate release task. |
-| Public delivery | [Assessment PR #1](https://github.com/roytanmoy1/linden-shelf/pull/1) is open from `feature/catalogue` into the README-only `main` | Candidate review and submission email; leave the review PR unmerged |
+| Journey | What the checks establish |
+| --- | --- |
+| Home | Exactly the five operator-selected IDs appear in order. Changing the configuration changes both membership and order without editing the UI. |
+| Category | Each department shows its editorial subset first, then other members without duplicates. The reviewer journey checks every category. |
+| Search | A submitted mixed-case, padded query returns exactly the matching products. A no-match query is empty. Opening history and typing alone do not fetch results. |
+| Product | A tile opens the correct detail URL; refresh and Back work. The live sweep opened all 20 products in four categories and decoded their photos with no external browser requests. A failed photo can be retried independently of a draft enquiry. |
+| Enquiry | Invalid input does not submit. SMTP acceptance produces a focused thank-you and one uniquely marked Mailpit message with the correct recipient, Reply-To and server-resolved product/price. SMTP refusal retains the form and does not confirm. |
 
 ## Technical and Delivery Rules
 
@@ -24,102 +21,32 @@ evidence for the local product, not a claim that a submission email was sent.
 | --- | --- |
 | Interactive PoC that can evolve; use AI, own the result, document assumptions | A real web catalogue and local SMTP inbox run without credentials. Two injected provider interfaces and separate UI styling support change. The [decisions](../DECISIONS.md) record ambiguous requirements, cuts, growth and next-day work. Personal review cannot be automated. |
 | Permitted client and backend; explain the choice | React/Vite/TypeScript and Node/Express/TypeScript. The [README](../README.md) explains why. No mobile client is claimed or required. |
-| No client calls to the product API | All categories, queries, details and image URLs come from Express. The only direct supplier requests are static photos under `/img/`. Browser tests distinguish image and metadata requests. |
+| No client calls to the supplier | All categories, search results, details and photo bytes come from Express. Production CSP also restricts image and data requests to the application origin. |
 | Infrastructure compatible with AWS | Portable Linux OCI containers, environment configuration and SMTP; no cloud-specific services. AWS deployment is neither required nor claimed. |
 | Local in under ten minutes; low setup burden | Docker Compose has a one-command entry point. The native route needs Node/npm and a local Mailpit binary. See the measured results below; Docker itself is unavailable on this host. |
 | No secrets; no paid services or reviewer accounts | The root example config contains local defaults. Git and image contexts exclude real env files, keys and private material. Public Fake Store plus local Mailpit require no registration. |
 | Repository, source, tests, open feature PR into main | Review the [feature branch](https://github.com/roytanmoy1/linden-shelf/tree/feature/catalogue) against `main`. The review PR must stay open; sending the links is a separate candidate action. |
 | Setup, build and test instructions | The root README has prerequisites, commands, URLs, configuration and a map of the workspaces. |
-| AI notes, instructions, plan, 3-5 moments and an actual correction | [AI usage](../AI_USAGE.md) contains the plan and five actual moments, links the project-specific instructions, and explains a browser-test mistake and how it was caught. The assistant tool is recorded; the model selector was not observed. Do not invent a model identifier. |
+| AI notes, instructions, plan, 3-5 moments and an actual correction | [AI usage](../AI_USAGE.md) records the tool and editor model selections, links the instructions, and describes the plan, five decisions and mistakes caught during verification. |
 | Time-box, actual time and interview ownership | [Time log](time-log.md) separates planning, building, testing and review, including follow-up work beyond the target. The [walkthrough](interview.md) prepares the 45-minute discussion and a small live change. Candidate review time is not claimed. |
-| Submission deadline | The original email specified Saturday 21 November at noon; the brief requests a reply within three days. An extension to Monday was requested, not confirmed in the available evidence. Confirm the agreed deadline before sending. |
 
-## Final Native Checks
+## Clean Release Evidence
 
-A clean copy of the submission files had no `node_modules`, prior build output
-or `.env`. With Node 24, npm 11, Chrome, local Mailpit and an existing npm cache,
-`npm ci` finished at 178.7s, the build at 216.9s and the real five-product
-browser home at **227.2s (3m47s)**. Isolated loopback ports used the same web/API
-code and a matching proxy target. This measures the native path, not a cold npm
-cache, installation of prerequisites or a Docker image build. An earlier timing
-attempt recorded only installation and was not counted as a successful start.
+- **Setup:** 198.1 seconds from starting `npm ci` in a source-only export through building the app, displaying the five live picks and decoding a photo. Node 24, npm 11, Chrome, local Mailpit and the npm cache were already present. No prior build, `node_modules`, or real `.env` was copied. This is a native time, not a Docker time.
+- **Code:** 340 unit/integration cases; 98.54% statements and 95.63% branches overall, with all four 80% per-file gates met. Lint, strict TypeScript, production build, compiled HTTP smoke and npm audit passed. The staged source tree was scanned for secrets separately.
+- **Browser regression gate:** 32 Chromium scenarios at 1440/820/390/320px. These cover keyboard and touch flows, Axe, Back/Forward, filters, history, photo recovery and failure/confirmation states. The photo-outage fixture remains unavailable until an explicit user retry; it does not assume a particular number of browser preload requests.
+- **Live acceptance:** the same reviewer-to-inbox journey passed in Chromium at all three reviewer widths, Firefox desktop, and mobile-sized WebKit. Each run verified its own Mailpit receipt. The local alternate-picks run used controlled supplier data and photos but the real API and SMTP transport.
+- **Recovery:** one supplier photo needed an explicit retry during the final 20-product sweep; all 20 decoded, with zero external browser requests. A local SMTP service returning 421 produced HTTP 503, zero matching messages and no thank-you. After restoring Mailpit, one explicit retry from the same form produced exactly one matching message. No external email was sent.
 
-The acceptance follow-up passed 299 unit/integration cases, including the
-test-only supplier isolation check, and all nine desktop/mobile Playwright cases.
-Per-file coverage gates passed: 99.25% statements, 96.19%
-branches, 100% lines/functions overall. Lint, strict TypeScript, production build,
-compiled startup smoke and npm audit passed; the audit reported zero known
-dependency vulnerabilities. These are not an image scan or a remote CI result.
+## Hosted Verification
 
-`npm run test:acceptance` was exercised with real local services using both the
-default selection and alternate picks `2,11,1,5,18`. No HTTP or SMTP success was
-mocked. Each invocation used its own marker and inspected its own Mailpit email;
-it neither cleared nor counted unrelated inbox messages. The PR's `reviewer`
-job runs the same command behind nginx on Linux. The job summary distinguishes
-the normal live attempt from the controlled-supplier run. The latter uses the
-original build start time, including the additional stop/restart of the test
-stack, as a conservative upper bound to visible tiles. The limit is under 600s.
+The [PR checks](https://github.com/roytanmoy1/linden-shelf/pull/1/checks) build
+and start the documented Compose stack on Linux, validate nginx, enforce the
+ten-minute budget and check graceful API shutdown. The `reviewer` job records
+live supplier availability separately from its controlled supplier run on the
+same images. A confirmed supplier refusal is **not** reported as a live pass;
+production does not substitute fixture data. The full fixture browser suite
+also runs against the built nginx frontend.
 
-The [diagnostic hosted run](https://github.com/roytanmoy1/linden-shelf/actions/runs/44993519482/job/137119540168)
-found that the real supplier returned 403 to the runner and that the production
-API correctly returned `502/UPSTREAM_ERROR`; the browser could not show five
-live products. No mock success or external-mail delivery is inferred from it.
-A subsequent independent acceptance run controls only supplier data and photo
-in an explicitly isolated stack. The same mode also passed locally with empty
-category sections and a uniquely marked actual email. See the [PR checks](https://github.com/roytanmoy1/linden-shelf/pull/1/checks)
-for each hosted result and timing.
-
-Focused regressions cover title/focus after an in-place retry, a new photo URL
-for a product whose original photo failed, and releasing an unread supplier
-response without masking its error. Status and content-type failures both cancel
-the response stream; valid responses retain the existing byte and time bounds.
-
-The live browser showed `Top rated | Linden Shelf` with all five product links.
-Submitting a synthetic enquiry for #3 returned 200 and displayed thank-you.
-Mailpit independently contained exactly one matching message from
-`catalogue@lindenshelf.test` to `sales@lindenshelf.test`, with the correct
-Reply-To, marked message and USD 55.99 price. No external mail was sent.
-
-The workspace rename preserved the original feature branch and commit. A scan
-of the authored submission files found no legacy brand identifiers. Regenerating
-the workspace links changed no third-party version, tarball URL or integrity
-digest in the 481 locked external entries.
-
-An offline `detect-secrets` scan of the 68 submission candidates reported three
-findings. All three were inspected: two dummy URL credentials in rejection tests
-and one synthetic SMTP setting in a configuration test. No real credential was
-identified. No suppression rule was added; this check is not a security guarantee.
-
-## Earlier 22 November Review
-
-- On the native app, home showed IDs 3, 5, 11, 18 and 20. Electronics showed #11 first, then five different products. Explicit search for `SSD` with surrounding spaces returned #10 and #11.
-- Clicking the #10 tile opened its actual details. A browser enquiry returned HTTP 200 and displayed thank-you. Exactly one matching local Mailpit email had the fixed sales recipient, synthetic Reply-To, correct title and USD 109.00 price. No external email was sent.
-- 285 Vitest cases passed with no skips. Coverage: 99.25% statements, 96.16% branches, 100% lines/functions. The two interface-only modules have no executable counters. All nine desktop/mobile Playwright cases passed (no skips or retries).
-- Lint, typecheck, production build and compiled health/validation smoke passed; npm audit reported zero known dependency advisories. The smoke timestamp was `2026-11-22T04:53:14.711Z`.
-- Focused tests confirmed two simultaneous catalogue reads make one upstream call; subsequent reads fetch fresh data after success or failure. The adapter rejects decoded JSON above 1 MiB before parsing. The browser, HTTP endpoint and provider share the same JSON media-type check.
-- A one-off TypeScript token scan of 22 production source files found no exact repeated 50-token windows spanning at least five lines within implementation statements. Imports, type-only declarations, generated output and tests were excluded. This does not detect shorter or semantically equivalent code and is not a CI gate.
-- The nginx framing policy and static-only gzip configuration have static tests. Neither Windows nor the registered Ubuntu distribution provided an nginx or container runtime. This is not a Docker, image scan or timed cold-start pass.
-
-## Earlier Live Evidence
-
-- **Supplier and browser (20 November):** all 20 records validated; the five picks spanned all four categories. All five real photos decoded. Desktop, 390px and 320px checks showed no overflow; reduced motion disabled transitions. The proxied health endpoint returned 200 and an unknown API route returned JSON 404, not the SPA.
-- **Failure first (20 November, 10:35:39 UTC):** with SMTP stopped, a real enquiry returned 503, preserved the form fields and did not show thank-you. At 10:36:07 UTC an unchanged-form retry succeeded after local Mailpit started. At 10:36:55 UTC its inbox contained one matching email with the configured addresses, synthetic Reply-To, server-resolved product #3 and USD 55.99 price. The Mailpit binary had been checked against its official SHA-256; no relay was configured.
-- **Evidence limits:** mocked browser responses are not SMTP receipts. The Node, nginx and Mailpit image tags existed for Linux amd64/arm64; registry metadata and static configuration tests are not image builds or runtime checks. No hosted CI run or cloud deployment is claimed.
-
-## Remaining Acceptance
-
-1. Check the latest PR job before submission. A failed build, missing mail or slow startup fails acceptance. A hosted supplier refusal is reported as live access not verified, never as a live product pass.
-2. Perform candidate code, accessibility and security review. Image scanning, separate client-IP verification through nginx and the remaining bundle warning are production-hardening follow-ups, not extra customer journeys.
-3. Confirm the agreed deadline and any model information available from the editor, add actual candidate review time, and email both links. The requested Monday extension has not been confirmed here.
-
-Docker is unavailable on the Windows workstation. Hosted results are recorded
-on GitHub; no external mailbox delivery, deployment or submission email is claimed.
-
-## When Opening the PR
-
-Use a title such as **Add Linden Shelf catalogue and sales enquiries**. In the
-description, explain why five editorial picks are not a ratings leaderboard;
-give the run command and inbox URL; distinguish automated coverage from an
-actual received message; and link the decisions, AI notes and time log. State
-any checks still unverified at publication. The reviewer needs the feature diff
-against `main`, so leave the PR open and send both public links only after review.
+These checks are not a cloud deployment, external-mailbox test, physical-device
+test, container-image audit or human assistive-technology certification.

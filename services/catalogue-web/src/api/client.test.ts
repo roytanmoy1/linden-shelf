@@ -14,7 +14,7 @@ describe('same-origin API boundary', () => {
     const signal = new AbortController().signal;
     expect(await client.getFeatured(signal)).toEqual({ products });
     expect(fetcher).toHaveBeenCalledExactlyOnceWith('/api/products/featured', expect.objectContaining({
-      signal, credentials: 'same-origin', redirect: 'error', cache: 'no-store',
+      signal, credentials: 'same-origin', redirect: 'error', cache: 'default',
     }));
   });
 
@@ -38,6 +38,15 @@ describe('same-origin API boundary', () => {
     const { client, fetcher } = setup({ products: [], featuredIds: [] });
     await client.list({});
     expect(fetcher.mock.calls[0]?.[0]).toBe('/api/products');
+  });
+
+  it.each([
+    { page: 2, pageSize: 8, pageCount: 1, total: 1 },
+    { page: 1, pageSize: 8, pageCount: 2, total: 1 },
+    { page: 1, pageSize: 8, pageCount: 1, total: 0 },
+  ])('rejects contradictory pagination metadata: %j', async (pagination) => {
+    const { client } = setup({ products: [product()], featuredIds: [], pagination });
+    await expect(client.list({ page: '1' })).rejects.toMatchObject({ code: 'INVALID_RESPONSE' });
   });
 
   it.each(['0', '-1', '01', '1e2', '9007199254740992', 'unknown'])('rejects invalid ID %s before IO', async (id) => {
