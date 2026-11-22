@@ -114,4 +114,16 @@ describe('container configuration (static checks, not a Docker runtime test)', (
     expect(commands).toContain('docker compose stop api');
     expect(steps).toContainEqual(expect.objectContaining({ if: 'always()', run: 'docker compose down' }));
   });
+
+  it('keeps the supplier double out of the default stack and distinguishes it from the live check', () => {
+    expect(read('compose.yaml')).not.toMatch(/supplier-preload|compose\.reviewer|tests\/fixtures/);
+    const override = parse(read('tests/compose.reviewer.yaml')) as { services: Record<string, { command: string[]; volumes: string[] }> };
+    expect(Object.keys(override.services)).toEqual(['api']);
+    expect(override.services.api!.command).toContain('/reviewer/supplier-preload.mjs');
+    expect(override.services.api!.volumes.every((mount) => mount.endsWith(':ro'))).toBe(true);
+    const workflow = read('.github/workflows/ci.yml');
+    expect(workflow).toContain("steps.supplier.outputs.available == 'true'");
+    expect(workflow).toContain('docker compose -f compose.yaml -f tests/compose.reviewer.yaml');
+    expect(read('services/catalogue-api/Dockerfile')).not.toContain('/reviewer/');
+  });
 });

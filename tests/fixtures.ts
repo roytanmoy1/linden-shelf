@@ -1,5 +1,7 @@
 import type { Enquiry, Product } from '@linden-shelf/contracts';
 
+export const fixturePhotoBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aYZkAAAAASUVORK5CYII=';
+
 export function product(overrides: Partial<Product> = {}): Product {
   return {
     id: 1,

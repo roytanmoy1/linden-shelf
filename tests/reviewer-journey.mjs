@@ -14,6 +14,8 @@ const picks = (process.env.FEATURED_PRODUCT_IDS ?? '3,5,11,18,20').split(',').ma
 const verify = expect.configure({ timeout: 15000 });
 const marker = `reviewer-${randomUUID()}`;
 const replyTo = `${marker}@example.test`;
+const controlled = process.env.REVIEWER_CONTROLLED_SUPPLIER === 'true';
+const sourceLabel = controlled ? 'controlled supplier and photo' : 'live Fake Store';
 
 async function json(url, status = 200) {
   const response = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(10000) });
@@ -55,6 +57,11 @@ const browser = await chromium.launch(executablePath ? { executablePath } : {});
 try {
   const page = await browser.newPage();
   page.setDefaultTimeout(15000);
+  if (controlled) {
+    const { fixturePhotoBase64 } = await import('./fixtures.ts');
+    await page.route('https://fakestoreapi.com/img/test-jacket.jpg', (route) =>
+      route.fulfill({ contentType: 'image/png', body: Buffer.from(fixturePhotoBase64, 'base64') }));
+  }
   page.on('pageerror', (error) => console.error(`Browser error: ${error.message.slice(0, 200)}`));
   page.on('response', (response) => {
     const url = new URL(response.url());
@@ -73,7 +80,7 @@ try {
   if (start !== undefined) {
     const elapsed = Date.now() - Number(start);
     assert(elapsed >= 0 && elapsed < 600000, `Build to usable catalogue took ${elapsed}ms; budget is under 10 minutes`);
-    console.log(`Compose build to five browser tiles: ${(elapsed / 1000).toFixed(1)}s`);
+    console.log(`Compose build to five browser tiles (${sourceLabel}): ${(elapsed / 1000).toFixed(1)}s`);
   }
 
   const { products } = await json(`${web}/api/products`);
@@ -125,7 +132,7 @@ try {
   await verify(page.getByRole('heading', { name: 'Thank you', exact: true })).toBeFocused();
   await checkMail(product);
   assert.deepEqual(externalData, [], 'The browser must not fetch external product metadata');
-  console.log('Passed: five chosen products, category partition, matching search, deep link, thank-you and one local SMTP receipt.');
+  console.log(`Passed: five chosen products, every category, search, deep link, thank-you and one local SMTP receipt (${sourceLabel}).`);
 } finally {
   await browser.close();
 }

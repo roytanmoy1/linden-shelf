@@ -1,0 +1,6 @@
+services:
+  api:
+    command: [node, --import, /reviewer/supplier-preload.mjs, services/catalogue-api/dist/server.js]
+    volumes:
+      - ./tests/supplier-preload.mjs:/reviewer/supplier-preload.mjs:ro
+      - ./tests/fixtures.ts:/reviewer/fixtures.ts:ro

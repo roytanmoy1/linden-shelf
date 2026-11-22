@@ -44,5 +44,11 @@ client rate limits. An HTTP test demonstrated the effect; forwarding is now
 trusted only in the protected one-hop configuration. This was tested at the API
 boundary, not claimed as a Docker runtime result.
 
+The first hosted browser check assumed that successful native supplier access
+meant the runner could also fetch products. It saw zero tiles. A status-only
+probe inside the unmodified API container showed the real cause: supplier 403,
+API 502. The test now separates that observation from deterministic browser,
+nginx and SMTP acceptance; it neither bypasses the refusal nor changes production data.
+
 See [verification evidence](docs/acceptance.md) and the [time log](docs/time-log.md).
 The private assessment, workstation settings and any credentials are excluded.

@@ -16,7 +16,7 @@ evidence for the local product, not a claim that a submission email was sent.
 | Proxy limiter | Test-first independent client quotas in explicit one-hop mode; native spoofing still ignored; nginx sanitization statically checked | nginx/Docker runtime forwarding probe |
 | Responsive/accessibility | Nine Playwright fixture journeys at 1440/390/320px, Axe scans, keyboard/focus, no overflow; live 390/320px layout and reduced motion checked | Human assistive-technology review |
 | Local reproducibility | Native clean-checkout timing below; the Linux `reviewer` job builds Compose, measures time through five visible tiles, checks nginx and verifies graceful API shutdown | See the latest PR run for actual results. Image vulnerability scanning is a separate release task. |
-| Public delivery | Public `feature/catalogue` against the README-only `main`; see the [assessment pull requests](https://github.com/roytanmoy1/linden-shelf/pulls) | Candidate review and submission email; leave the review PR unmerged |
+| Public delivery | [Assessment PR #1](https://github.com/roytanmoy1/linden-shelf/pull/1) is open from `feature/catalogue` into the README-only `main` | Candidate review and submission email; leave the review PR unmerged |
 
 ## Technical and Delivery Rules
 
@@ -44,8 +44,9 @@ code and a matching proxy target. This measures the native path, not a cold npm
 cache, installation of prerequisites or a Docker image build. An earlier timing
 attempt recorded only installation and was not counted as a successful start.
 
-The acceptance follow-up passed 298 unit/integration cases and all nine desktop/mobile
-Playwright cases. Per-file coverage gates passed: 99.25% statements, 96.19%
+The acceptance follow-up passed 299 unit/integration cases, including the
+test-only supplier isolation check, and all nine desktop/mobile Playwright cases.
+Per-file coverage gates passed: 99.25% statements, 96.19%
 branches, 100% lines/functions overall. Lint, strict TypeScript, production build,
 compiled startup smoke and npm audit passed; the audit reported zero known
 dependency vulnerabilities. These are not an image scan or a remote CI result.
@@ -54,8 +55,19 @@ dependency vulnerabilities. These are not an image scan or a remote CI result.
 default selection and alternate picks `2,11,1,5,18`. No HTTP or SMTP success was
 mocked. Each invocation used its own marker and inspected its own Mailpit email;
 it neither cleared nor counted unrelated inbox messages. The PR's `reviewer`
-job runs the same command behind nginx on Linux. Its job summary is the source
-of record for the observed build-to-usable time; the limit is under 600 seconds.
+job runs the same command behind nginx on Linux. The job summary distinguishes
+the normal live attempt from the controlled-supplier run. The latter uses the
+original build start time, including the additional stop/restart of the test
+stack, as a conservative upper bound to visible tiles. The limit is under 600s.
+
+The [diagnostic hosted run](https://github.com/roytanmoy1/linden-shelf/actions/runs/44993519482/job/137119540168)
+found that the real supplier returned 403 to the runner and that the production
+API correctly returned `502/UPSTREAM_ERROR`; the browser could not show five
+live products. No mock success or external-mail delivery is inferred from it.
+A subsequent independent acceptance run controls only supplier data and photo
+in an explicitly isolated stack. The same mode also passed locally with empty
+category sections and a uniquely marked actual email. See the [PR checks](https://github.com/roytanmoy1/linden-shelf/pull/1/checks)
+for each hosted result and timing.
 
 Focused regressions cover title/focus after an in-place retry, a new photo URL
 for a product whose original photo failed, and releasing an unread supplier
@@ -96,7 +108,7 @@ identified. No suppression rule was added; this check is not a security guarante
 
 ## Remaining Acceptance
 
-1. Check the latest PR job before submission; a failed build, missing mail, slow startup or unavailable supplier is not a pass.
+1. Check the latest PR job before submission. A failed build, missing mail or slow startup fails acceptance. A hosted supplier refusal is reported as live access not verified, never as a live product pass.
 2. Perform candidate code, accessibility and security review. Image scanning, separate client-IP verification through nginx and the remaining bundle warning are production-hardening follow-ups, not extra customer journeys.
 3. Confirm the agreed deadline and any model information available from the editor, add actual candidate review time, and email both links. The requested Monday extension has not been confirmed here.
 

@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
-import { catalogueResponses } from '../fixtures.js';
+import { catalogueResponses, fixturePhotoBase64 } from '../fixtures.js';
 
 async function installFixtures(page: Page) {
   const responses = catalogueResponses();
@@ -11,9 +11,7 @@ async function installFixtures(page: Page) {
       externalMetadata.push(route.request().url());
       return route.abort();
     }
-    await route.fulfill({ contentType: 'image/png', body: Buffer.from(
-      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aYZkAAAAASUVORK5CYII=', 'base64',
-    ) });
+    await route.fulfill({ contentType: 'image/png', body: Buffer.from(fixturePhotoBase64, 'base64') });
   });
   await page.route((url) => url.pathname.startsWith('/api/'), async (route) => {
     const url = new URL(route.request().url());

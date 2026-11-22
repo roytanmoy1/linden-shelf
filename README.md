@@ -58,10 +58,10 @@ Healthchecks make no public-source calls and send no email. The Dockerfiles use
 Node 24.22.3, unprivileged nginx 1.31.7 and Mailpit 1.34.0 with non-root processes,
 read-only filesystems, temporary writable directories and dropped capabilities.
 
-The PR's `reviewer` job builds this stack on a fresh Linux runner and times it
-from the start of Compose through five visible product tiles. See the job summary
-in [GitHub Actions](https://github.com/roytanmoy1/linden-shelf/actions) for the
-measured time and outcome; local network, image-cache and hardware speeds vary.
+The PR's `reviewer` job times the unmodified stack through healthy services.
+Its [GitHub Actions](https://github.com/roytanmoy1/linden-shelf/actions) summary
+separately labels build-to-browser timings by product source. The public supplier
+has returned HTTP 403 to hosted runners; that outcome is reported, not bypassed.
 
 ### Choose the five products
 
@@ -188,8 +188,17 @@ set `WEB_PORT=5173` in the test shell. Pass the same `FEATURED_PRODUCT_IDS`,
 
 [CI](.github/workflows/ci.yml) has read-only repository permission. Pushes run
 coverage, lint, typecheck, build, smoke and dependency audit. Pull requests add
-the Docker reviewer journey and graceful API shutdown. The live acceptance run
-requires Fake Store to be reachable; isolated unit tests do not. There is no deployment job.
+the Docker reviewer journey and graceful API shutdown. The default stack always
+tries the real supplier. A live browser pass is recorded only if it succeeds;
+if the supplier independently returns 403 and the API returns `502/UPSTREAM_ERROR`,
+CI reports that limitation explicitly. Other unexpected failures fail the job.
+
+A separate CI step always runs the same browser journey using the same images
+with the [test-only override](tests/compose.reviewer.yaml). It mounts a synthetic
+supplier response at the API's outbound fetch boundary; the browser test supplies
+the matching synthetic photo. It does **not** mock the app's HTTP routes, catalogue
+logic, nginx, email transport or Mailpit. This isolates our behavior from public
+supplier availability. It is never loaded by the normal quickstart. There is no deployment job.
 
 ## API Contract
 

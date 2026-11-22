@@ -81,9 +81,11 @@ and public review are delivery requirements, not application features.
   actual transfer sizes through the container remain unmeasured.
 - **Scope:** no datastore, auth, cart, queue, provider registry or cloud SDK.
   No customer journey was intentionally dropped. Native SMTP acceptance passes;
-  The live stack check is deliberately separate from deterministic test suites:
-  it tests the actual reviewer path, including the public supplier, and reports
-  failures rather than substituting fixtures. CI runs checks only.
+  Native acceptance used the real supplier. The PR first probes the unmodified
+  Compose stack: a confirmed supplier 403 is reported alongside the API's 502,
+  not presented as a successful live journey. A separately named, test-only
+  Compose run controls the supplier response and photo, not the app or SMTP.
+  The same images are used for both. The application has no fixture fallback.
 - **Publication:** the owner authorized renaming the original empty repository to
   `linden-shelf` and publishing the solution on `feature/catalogue`. The public
   `main` is a README-only review baseline. An open, unmerged PR is authorized
