@@ -1,14 +1,23 @@
 import type { Product } from '@linden-shelf/contracts';
 import { describe, expect, it, vi } from 'vitest';
 import { catalogueFixture, product } from '../../../../tests/fixtures.js';
+import { readConfig } from '../config.js';
 import { CatalogueService } from './catalogue-service.js';
 
-function setup(products: Product[] = catalogueFixture()) {
+function setup(products: Product[] = catalogueFixture(), environment: NodeJS.ProcessEnv = {}) {
   const source = { getProducts: vi.fn<() => Promise<Product[]>>().mockResolvedValue(products) };
-  return { source, catalogue: new CatalogueService(source) };
+  return { source, catalogue: new CatalogueService(source, readConfig(environment).featuredProductIds) };
 }
 
 describe('editorial catalogue', () => {
+  it('uses the owner-selected membership and order for both the home and category pages', async () => {
+    const { catalogue } = setup(catalogueFixture(), { FEATURED_PRODUCT_IDS: '2, 11, 1, 5, 18' });
+    expect((await catalogue.getFeatured()).map((item) => item.id)).toEqual([2, 11, 1, 5, 18]);
+    const category = await catalogue.list({ category: "men's clothing" });
+    expect(category.featuredIds).toEqual([2, 1]);
+    expect(category.products.map((item) => item.id)).toEqual([2, 1, 3]);
+  });
+
   it('returns exactly the five configured IDs, not the highest ratings', async () => {
     const { catalogue, source } = setup();
     const featured = await catalogue.getFeatured();

@@ -18,9 +18,10 @@ function setup(mailer?: EnquiryMailer, trustIngressProxy = false) {
   const send = vi.fn<EnquiryMailer['send']>().mockResolvedValue(undefined);
   const rateLimitStore = new MemoryStore();
   stores.push(rateLimitStore);
+  const config = readConfig({});
   const app = createApp({
-    catalogue: new CatalogueService(source), mailer: mailer ?? { send },
-    allowedOrigins: readConfig({}).allowedOrigins, rateLimitStore, trustIngressProxy,
+    catalogue: new CatalogueService(source, config.featuredProductIds), mailer: mailer ?? { send },
+    allowedOrigins: config.allowedOrigins, rateLimitStore, trustIngressProxy,
   });
   return { app, source, send };
 }

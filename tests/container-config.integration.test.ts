@@ -102,4 +102,16 @@ describe('container configuration (static checks, not a Docker runtime test)', (
       'npm run build', 'node tests/server-smoke.mjs', 'npm audit --audit-level=high',
     ]);
   });
+
+  it('exercises the reviewer stack, the browser-to-inbox journey and cleanup on pull requests', () => {
+    const workflow = parse(read('.github/workflows/ci.yml')) as {
+      jobs: { reviewer?: { steps: { run?: string; if?: string }[] } };
+    };
+    const steps = workflow.jobs.reviewer?.steps ?? [];
+    const commands = steps.map((step) => step.run).join('\n');
+    expect(commands).toContain('docker compose up --build --wait');
+    expect(commands).toContain('npm run test:acceptance');
+    expect(commands).toContain('docker compose stop api');
+    expect(steps).toContainEqual(expect.objectContaining({ if: 'always()', run: 'docker compose down' }));
+  });
 });

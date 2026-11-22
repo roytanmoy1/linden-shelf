@@ -28,7 +28,7 @@ These are paraphrases of real directions and checkpoints, not invented quotation
 2. Work through each journey locally; do not publish yet. The implementation uses portable containers and an account-free inbox. No hosting deployment was substituted for the requested open PR.
 3. Prove email, not just a success screen. We stopped SMTP, observed a 503 with the form intact, restored Mailpit, retried and inspected the received message. The mocked UI tests alone could not establish this.
 4. Review security, performance and duplication. A failing two-reader test showed the home page could fetch the same supplier dataset twice. Sharing only an unfinished read fixed it without caching a stale price or a failure.
-5. Use neutral branding and make the code explainable. A failing UI test exposed the old loading header; the brand link is now shared. An audit of all four PDF pages and a code-linked [walkthrough](docs/interview.md) distinguish requirements, choices and pending work.
+5. Audit all four PDF pages and make the choices explainable. The [walkthrough](docs/interview.md) traces the real code. A follow-up acceptance test demonstrated that changing the operator's pick list had no effect on the old hardcoded selection. Backend configuration and a real browser-to-Mailpit check now cover that gap.
 
 ## A Mistake We Caught
 

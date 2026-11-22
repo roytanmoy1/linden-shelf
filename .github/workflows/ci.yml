@@ -26,3 +26,40 @@ jobs:
       - run: npm run build
       - run: node tests/server-smoke.mjs
       - run: npm audit --audit-level=high
+
+  reviewer:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      FEATURED_PRODUCT_IDS: '2,11,1,5,18'
+      COMPOSE_PROJECT_NAME: linden-reviewer
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.22.3
+          cache: npm
+      - run: npm ci
+      - name: Start the documented stack and exercise all five journeys
+        shell: bash
+        run: |
+          export PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH="$(command -v google-chrome)"
+          test -x "$PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH"
+          export REVIEWER_STARTED_MS="$(date +%s%3N)"
+          timeout 600s docker compose up --build --wait
+          docker compose exec -T web nginx -t
+          curl -fsSI http://127.0.0.1:3000/ | grep -Fi "frame-ancestors 'none'"
+          docker compose exec -T api node -e "if (process.env.SMTP_HOST !== 'mailpit' || process.env.SMTP_PORT !== '1025') process.exit(1)"
+          npm run test:acceptance | tee "$RUNNER_TEMP/reviewer-journey.log"
+          grep -E '^(Compose build|Passed:)' "$RUNNER_TEMP/reviewer-journey.log" >> "$GITHUB_STEP_SUMMARY"
+      - name: Verify graceful Linux shutdown
+        run: |
+          docker compose stop api
+          docker compose logs --no-color api | grep -F '"event":"api_stopped"'
+          test "$(docker inspect --format '{{.State.ExitCode}}' "$(docker compose ps -aq api)")" = 0
+      - name: Remove the isolated reviewer stack
+        if: always()
+        run: docker compose down

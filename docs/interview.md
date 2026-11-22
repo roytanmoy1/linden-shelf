@@ -36,9 +36,9 @@ Start with the product: a customer can find an item and contact sales. There is 
 
 **Request:** "Show the bracelet first on the home page; keep the same five products."
 
-1. Predict the owner before using search: this is editorial order, not page layout or supplier ranking.
-2. In the [catalogue service test](../services/catalogue-api/src/catalogue/catalogue-service.test.ts), change the expected featured order from `3, 5, 11, 18, 20` to `5, 3, 11, 18, 20`. Run `npm test -- services/catalogue-api/src/catalogue/catalogue-service.test.ts` and see it fail on order.
-3. Reorder `FEATURED_IDS` in the service. Rerun the focused test, then `npm test`. Update expectations that deliberately pin that editorial choice; keep the independent checks for five items, filtering and no duplicates. The React rendering code should not need an edit.
+1. Predict the owner: this is an editorial choice, not page layout or supplier ranking. Set `FEATURED_PRODUCT_IDS=5,3,11,18,20` and restart the API (or run `docker compose up -d` for Compose). No TypeScript change is necessary.
+2. Follow [startup validation](../services/catalogue-api/src/config.ts) into [the catalogue service](../services/catalogue-api/src/catalogue/catalogue-service.ts). Check that the home page puts #5 first and category picks still appear once each. The API, not React, owns the order.
+3. The [service test](../services/catalogue-api/src/catalogue/catalogue-service.test.ts) also replaces members of the set. Run `npm test -- services/catalogue-api/src/catalogue/catalogue-service.test.ts`. For a **code** exercise, add a case for a second search term in the description and trace which layer would change if search became title-only.
 
 This is a practice exercise, not a change applied to the submission. Try these questions without notes:
 

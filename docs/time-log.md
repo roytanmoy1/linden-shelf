@@ -23,6 +23,7 @@ and container testing are not counted.
 - 22 Nov: the first review regression ran at 10:16:42; final lint finished at 10:29:30. The 15-20 minute estimate includes adjacent setup and documentation.
 - 22 Nov: rename inventory was recorded at 10:32:41; the new checkout passed its final release gates at 10:54:52. A clock reading at 11:08:10 after the clean native verification establishes 35m29s for this phase, rounded above.
 - 22 Nov: the recovery fixes and release pass started at 11:16:12. The local gates finished at 11:24:22, and the public review baseline was created at 11:25:04. That adds roughly nine minutes through the baseline (about three each for implementation, tests and release review), bringing the estimate to about 3h45-50m before final staging and push.
+- 22 Nov: acceptance-gap review began at 11:38:12. The native release gates finished at 11:46:17 (8m05s elapsed; roughly one minute inspecting, four building, three testing). Subsequent all-category browser verification, documentation, PR preparation and hosted runner time are outside that interval. This brings the measured/estimated work to roughly four hours before candidate review.
 
 Build and test work were interleaved, so the per-activity allocation is
 retrospective. See [acceptance.md](acceptance.md) for what was verified in those intervals.

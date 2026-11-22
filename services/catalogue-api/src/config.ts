@@ -1,5 +1,5 @@
 import { isIP } from 'node:net';
-import { emailSchema } from '@linden-shelf/contracts';
+import { emailSchema, FEATURED_COUNT, productIdParamSchema } from '@linden-shelf/contracts';
 import { z } from 'zod';
 
 const originSchema = z.url().pipe(z.string().refine((value) => {
@@ -21,6 +21,10 @@ const configSchema = z.object({
   PRODUCT_API_BASE_URL: originSchema.refine((value) => value === 'https://fakestoreapi.com')
     .default('https://fakestoreapi.com'),
   PRODUCT_TIMEOUT_MS: integerSetting(5000, 5000),
+  FEATURED_PRODUCT_IDS: z.string().max(160).default('3,5,11,18,20')
+    .transform((value) => value.split(',').map((id) => id.trim()))
+    .pipe(z.array(productIdParamSchema).length(FEATURED_COUNT))
+    .refine((ids) => new Set(ids).size === ids.length),
   SMTP_HOST: z.string().min(1).max(253).refine((value) => isIP(value) > 0
     || /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$/i.test(value))
     .default('127.0.0.1'),
@@ -52,6 +56,7 @@ export function readConfig(environment: NodeJS.ProcessEnv) {
     host: config.HOST, port: config.PORT, allowedOrigins: config.ALLOWED_ORIGINS,
     trustIngressProxy: config.TRUST_INGRESS_PROXY,
     productApiBaseUrl: config.PRODUCT_API_BASE_URL, productTimeoutMs: config.PRODUCT_TIMEOUT_MS,
+    featuredProductIds: config.FEATURED_PRODUCT_IDS,
     smtpHost: config.SMTP_HOST, smtpPort: config.SMTP_PORT, smtpSecure: config.SMTP_SECURE,
     smtpUser: config.SMTP_USER, smtpPassword: config.SMTP_PASSWORD,
     smtpConnectionTimeoutMs: config.SMTP_CONNECTION_TIMEOUT_MS,

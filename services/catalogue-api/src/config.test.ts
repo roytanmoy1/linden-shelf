@@ -2,11 +2,18 @@ import { describe, expect, it } from 'vitest';
 import { readConfig } from './config.js';
 
 describe('startup configuration', () => {
+  it.each(['1,2,3,4', '1,2,3,4,5,6', '1,2,3,4,4', '1,2,3,4,0', '1,2,3,4,1.5', '1,2,3,4,9007199254740992', ''])(
+    'rejects an invalid editorial selection before serving requests: %j', (selection) => {
+      expect(() => readConfig({ FEATURED_PRODUCT_IDS: selection })).toThrow('Invalid configuration: FEATURED_PRODUCT_IDS');
+    },
+  );
+
   it('validates explicit safe native defaults', () => {
     expect(readConfig({})).toEqual({
       host: '127.0.0.1', port: 3001, trustIngressProxy: false,
       allowedOrigins: ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:5173', 'http://127.0.0.1:5173'],
       productApiBaseUrl: 'https://fakestoreapi.com', productTimeoutMs: 5000,
+      featuredProductIds: [3, 5, 11, 18, 20],
       smtpHost: '127.0.0.1', smtpPort: 1025, smtpSecure: false,
       smtpUser: '', smtpPassword: '', smtpConnectionTimeoutMs: 5000,
       smtpGreetingTimeoutMs: 5000, smtpSocketTimeoutMs: 10000,

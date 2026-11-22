@@ -28,6 +28,7 @@ services:
       ALLOWED_ORIGINS: "http://localhost:${WEB_PORT:-3000},http://127.0.0.1:${WEB_PORT:-3000}"
       PRODUCT_API_BASE_URL: "${PRODUCT_API_BASE_URL:-https://fakestoreapi.com}"
       PRODUCT_TIMEOUT_MS: "${PRODUCT_TIMEOUT_MS:-5000}"
+      FEATURED_PRODUCT_IDS:
       SMTP_HOST: mailpit
       SMTP_PORT: "1025"
       SMTP_SECURE: "false"

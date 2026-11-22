@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 export const CATALOGUE_BOUNDS = { title: 300, description: 10000, category: 100, query: 200 } as const;
+export const FEATURED_COUNT = 5;
 export const productIdSchema = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
 export const productIdParamSchema = z.string().regex(/^[1-9]\d*$/).transform(Number).pipe(productIdSchema);
 
@@ -38,7 +39,7 @@ export const catalogueQuerySchema = z.strictObject({
 }));
 
 export const productResponseSchema = z.object({ product: productSchema });
-export const featuredProductsResponseSchema = z.object({ products: z.array(productSchema).length(5) });
+export const featuredProductsResponseSchema = z.object({ products: z.array(productSchema).length(FEATURED_COUNT) });
 export const catalogueResponseSchema = z.object({ products: z.array(productSchema), featuredIds: z.array(productIdSchema) });
 export const categoriesResponseSchema = z.object({ categories: z.array(categorySchema) });
 

@@ -9,7 +9,7 @@ try {
   const config = readConfig(process.env);
   const transport = createSmtpTransport(config);
   const app = createApp({
-    catalogue: new CatalogueService(new FakeStoreProductSource(config)),
+    catalogue: new CatalogueService(new FakeStoreProductSource(config), config.featuredProductIds),
     mailer: new SmtpEnquiryMailer(transport, config),
     allowedOrigins: config.allowedOrigins,
     trustIngressProxy: config.trustIngressProxy,

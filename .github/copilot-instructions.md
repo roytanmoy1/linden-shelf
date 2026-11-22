@@ -5,7 +5,7 @@
   `services/catalogue-web` with Fluent UI v9 and locally bundled IBM Plex Sans.
 - Keep Express handlers thin. Inject `ProductSource` and `EnquiryMailer`; construct
   their live adapters only at startup. Do not introduce a registry or database.
-- Editorial featured IDs are `[3, 5, 11, 18, 20]`, not a rating sort. Never mask a
+- Editorial featured IDs are configurable; the defaults are `[3, 5, 11, 18, 20]`, not a rating sort. Never mask a
   source failure with fixture data. Browser product metadata must use our API.
 - Share Zod schemas and limits. Email success requires acceptance of the fixed
   configured sales recipient; never log contact values or provider payloads.

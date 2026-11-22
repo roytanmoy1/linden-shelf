@@ -4,7 +4,7 @@
 
 | What the brief leaves open | Decision and reason |
 | --- | --- |
-| Who chooses the five, and in what order? | "I have chosen" means editorial selection, not a numeric leaderboard. Server-owned IDs `[3, 5, 11, 18, 20]` define both membership and order. They cover all four current categories. A missing pick fails explicitly rather than silently changing the owner's choice. |
+| Who chooses the five, and in what order? | The operator sets `FEATURED_PRODUCT_IDS`: exactly five distinct product IDs, in display order. Defaults `3,5,11,18,20` cover all four current categories. An environment setting avoids an admin UI or code edit. Invalid lists fail startup; a selected product absent from the supplier fails explicitly. |
 | What counts as top rated within a category? | Use the same editorial picks filtered to that category; show remaining products once each in ascending ID order. The two sections have explicit empty states. An unknown category is a 404. |
 | Which text matches? What about whitespace or no term? | Submit by button or Enter, not on every keystroke. Trim the term and match case-insensitive substrings in title, description or category. Empty means browse all; no match is a successful empty list. No fuzzy ranking or ID/price matching. |
 | What is a detail page? | A shareable `/products/:id` with photo, title, description, category, USD price and rating. Refresh works. A malformed ID is 400; a valid but absent ID is 404. USD is an assumption because the supplier has no currency field. |
@@ -40,7 +40,7 @@ and public review are delivery requirements, not application features.
   Direct exposure, untrusted peer containers or a shorter ingress path invalidate
   the boundary. No static Docker IP/subnet or DNS-trust machinery is needed.
 - **Toolchain:** isolated Node 24/npm 11 avoids changing the incompatible host
-  runtime. Native API work is possible; Docker and Compose verification are not.
+  runtime. Native checks run locally; the PR runs the Docker check on Linux.
 - **Startup and coverage:** compiled shared-package exports are used at runtime,
   with source aliases only in tests. Process/browser bootstrap entries are outside
   unit coverage; compiled smoke and browser checks cover their wiring. Tests/setup
@@ -66,7 +66,8 @@ and public review are delivery requirements, not application features.
   API/SMTP ports, explicit maintained image versions, non-root and read-only
   runtimes. Mailpit writes only temporary local data. Compose derives allowed
   origins from its web port. Native SMTP uses loopback 1025 instead of the
-  container DNS name. Runtime verification is pending because Docker is absent.
+  container DNS name. A separate PR check runs the production containers and
+  verifies an SMTP receipt. It does not deploy the app or send external email.
 - **Security headers:** nginx API responses never enter the SPA fallback.
   `expires -1` on HTML preserves inherited security headers; location-level
   `add_header` would otherwise replace them. Fluent runtime styling needs inline
@@ -80,11 +81,13 @@ and public review are delivery requirements, not application features.
   actual transfer sizes through the container remain unmeasured.
 - **Scope:** no datastore, auth, cart, queue, provider registry or cloud SDK.
   No customer journey was intentionally dropped. Native SMTP acceptance passes;
-  Docker acceptance and human review are still required. CI runs checks only.
+  The live stack check is deliberately separate from deterministic test suites:
+  it tests the actual reviewer path, including the public supplier, and reports
+  failures rather than substituting fixtures. CI runs checks only.
 - **Publication:** the owner authorized renaming the original empty repository to
   `linden-shelf` and publishing the solution on `feature/catalogue`. The public
-  `main` is a README-only review baseline. The feature push is separate from
-  opening or merging the assessment PR, deploying, or emailing the reviewers.
+  `main` is a README-only review baseline. An open, unmerged PR is authorized
+  for review; sending the email, merging and deploying are separate actions.
 
 ## Growth Beyond the Proof of Concept
 
@@ -109,7 +112,7 @@ without changing their meaning or the customer-facing routes.
 
 ## With Another Day
 
-- First close the verification gaps: clean Docker startup timing, nginx forwarding/API isolation, Linux shutdown, container-image scanning and the same real SMTP journey through Compose.
+- Review the latest Docker timing and local email evidence; exercise independent client quotas through nginx and scan the built container images before a production release.
 - Review the code and accessibility with the candidate, run CI after authorized publication, and confirm the recorded model/time information before submission.
 - Measure mobile loading and bundle composition, then reduce the initial Fluent/application payload based on those measurements rather than suppressing the bundle warning.
 - Exercise an alternate product-source and email adapter with contract tests. Agree delivery guarantees and scaling needs before adding a database, outbox, shared limiter or administration UI.

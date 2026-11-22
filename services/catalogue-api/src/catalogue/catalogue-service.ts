@@ -2,13 +2,11 @@ import { catalogueQuerySchema, type CatalogueResponse, type Product } from '@lin
 import { ApiError } from '../http/errors.js';
 import type { ProductSource } from './product-source.js';
 
-const FEATURED_IDS = [3, 5, 11, 18, 20] as const;
-
 export class CatalogueService {
-  constructor(private readonly source: ProductSource) {}
+  constructor(private readonly source: ProductSource, private readonly featuredProductIds: readonly number[]) {}
 
   private selectFeatured(products: Product[]): Product[] {
-    return FEATURED_IDS.map((id) => {
+    return this.featuredProductIds.map((id) => {
       const selected = products.find((product) => product.id === id);
       if (!selected) throw new ApiError('UPSTREAM_INVALID_DATA');
       return selected;

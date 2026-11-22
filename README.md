@@ -58,10 +58,23 @@ Healthchecks make no public-source calls and send no email. The Dockerfiles use
 Node 24.22.3, unprivileged nginx 1.31.7 and Mailpit 1.34.0 with non-root processes,
 read-only filesystems, temporary writable directories and dropped capabilities.
 
-**This path has static configuration tests, not runtime verification.** The three
-exact image tags were confirmed in the public registry, including Linux amd64 and
-arm64 variants. Docker is unavailable here. Image pulls/builds, Compose
-startup, Linux shutdown and the under-ten-minute cold-start target are unverified.
+The PR's `reviewer` job builds this stack on a fresh Linux runner and times it
+from the start of Compose through five visible product tiles. See the job summary
+in [GitHub Actions](https://github.com/roytanmoy1/linden-shelf/actions) for the
+measured time and outcome; local network, image-cache and hardware speeds vary.
+
+### Choose the five products
+
+By default the home page shows IDs `3,5,11,18,20` in that order. To change them,
+set `FEATURED_PRODUCT_IDS` in the shell or in a root `.env` (see [.env.example](.env.example)),
+then run `docker compose up -d` again to recreate the API with the new setting.
+For native development, restart the API instead. No image rebuild or frontend
+change is needed. Example: `FEATURED_PRODUCT_IDS=2,11,1,5,18`.
+
+Use exactly five **distinct positive product IDs** from `GET /api/products`.
+Category pages use the same editorial order for their matching subset. Invalid
+configuration stops startup; a valid ID missing from the supplier returns an
+explicit catalogue error rather than silently substituting another product.
 
 ## Native Development
 
@@ -159,10 +172,24 @@ keyboard/focus, deep links, search, enquiry states, Axe accessibility and overfl
 API and image responses in this suite are test-only fixtures, **not SMTP or live
 image evidence**. Screenshots stay in ignored `test-results/`; tracing is disabled.
 
-[CI](.github/workflows/ci.yml) has read-only repository permission and only runs
-install, coverage, lint, typecheck, build, compiled smoke and dependency audit.
-See [GitHub Actions](https://github.com/roytanmoy1/linden-shelf/actions) for the
-status of a particular commit. There is no deployment job.
+For the **unmocked** run, start the local Compose stack above, install the locked
+Node dependencies with `npm ci` and use Chromium as for `test:browser`. Then run:
+
+```sh
+npm run test:acceptance
+```
+
+Use **only a local test stack connected to Mailpit**, never production SMTP.
+The command drives all five journeys and sends one synthetic email. It checks
+the uniquely marked message in Mailpit rather than clearing the inbox or trusting
+the thank-you screen. Default ports are web 3000 and inbox 8025. For native Vite,
+set `WEB_PORT=5173` in the test shell. Pass the same `FEATURED_PRODUCT_IDS`,
+`SALES_EMAIL` and alternate ports to the test shell if the stack overrides them.
+
+[CI](.github/workflows/ci.yml) has read-only repository permission. Pushes run
+coverage, lint, typecheck, build, smoke and dependency audit. Pull requests add
+the Docker reviewer journey and graceful API shutdown. The live acceptance run
+requires Fake Store to be reachable; isolated unit tests do not. There is no deployment job.
 
 ## API Contract
 
@@ -176,7 +203,7 @@ status of a particular commit. There is no deployment job.
 | POST | `/api/enquiries` | `{status: "sent"}` only after SMTP acceptance |
 
 Products use the shared [catalogue schema](packages/contracts/src/catalogue.ts).
-Editorial IDs are exactly `[3, 5, 11, 18, 20]`, not a rating leaderboard. Missing
+Editorial IDs come from the five configured picks, not a rating leaderboard. Missing
 selections fail explicitly. Browse order is ascending ID; a category puts its
 selected subset first, followed by remaining IDs once each. Category and query
 intersect. Query matching trims input and searches title/description/category,
